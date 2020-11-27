@@ -13,7 +13,7 @@ definition propagate_cond where
            fv2 = Formula.fv f2 
       in  (rr1 \<inter> (fv2 \<setminus> rr2)) \<supset> \<emptyset> )"
 *)
-
+(*
 fun rewrite_1 where
   "rewrite_1 (Formula.And a (Formula.Or b g)) =
      (let a' = rewrite_1 a;
@@ -21,9 +21,10 @@ fun rewrite_1 where
           g' = rewrite_1 g
      in Formula.Or (Formula.And a' b') (Formula.And a' g'))"
 | "rewrite_1 x = x"
+*)
 
-lemma sat_rewrite_1: "Formula.sat \<sigma> V v i (rewrite_1 \<phi>) =
-                      Formula.sat \<sigma> V v i \<phi>"
+lemma sat_rewrite_1: "Formula.sat \<sigma> V v i (Formula.And a (Formula.Or b g) =
+                      Formula.sat \<sigma> V v i (Formula.Or (Formula.And a' b') (Formula.And a' g'))"
 
 proof (induction \<phi> rule: rewrite_1.induct)
   case (1 a b g)
@@ -32,19 +33,20 @@ proof (induction \<phi> rule: rewrite_1.induct)
 qed simp_all
 
 
-
+(*
 fun rewrite_5 where
   "rewrite_5 (Formula.And a (Formula.Neg b)) =
      (let a' = rewrite_5 a;
           b' = rewrite_5 b
      in (Formula.And a' (Formula.Neg (Formula.And a' b'))))"
 | "rewrite_5 x = x"
+*)
 
-lemma sat_rewrite_5: "Formula.sat \<sigma> V v i (rewrite_5 \<phi>) =
-                      Formula.sat \<sigma> V v i \<phi>"
+lemma sat_rewrite_5: "Formula.sat \<sigma> V v i (Formula.And a (Formula.Neg b))  = 
+                      Formula.sat \<sigma> V v i (Formula.And a (Formula.Neg (Formula.And a b)))"
 
 proof (induction \<phi> rule: rewrite_5.induct)
-  case (1 a b)
+  case (1 a b )
   then show ?case
     by (auto simp add: Let_def)
 qed simp_all
