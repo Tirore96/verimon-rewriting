@@ -56,8 +56,19 @@ fun shiftTI :: "nat \<Rightarrow> Formula.trm \<Rightarrow> Formula.trm" where
  "shiftTI k t = (case t of (Formula.Var i) \<Rightarrow> (if i < k then Formula.Var i 
                                                else Formula.Var (i + 1))
                          | Formula.Plus t u \<Rightarrow> Formula.Plus (shiftTI k t) (shiftTI k u)
+                         | Formula.Minus t u \<Rightarrow> Formula.Minus (shiftTI k t) (shiftTI k u)
+                         | Formula.UMinus t \<Rightarrow> Formula.UMinus (shiftTI k t)
+                         | Formula.Mult t u \<Rightarrow> Formula.Mult (shiftTI k t) (shiftTI k u)
+                         | Formula.Div t u \<Rightarrow> Formula.Div (shiftTI k t) (shiftTI k u)
+                         | Formula.Mod t u \<Rightarrow> Formula.Mod (shiftTI k t) (shiftTI k u)
+                         | Formula.F2i t \<Rightarrow> Formula.F2i (shiftTI k t)
+                         | Formula.I2f t \<Rightarrow> Formula.I2f (shiftTI k t)
                          | _ \<Rightarrow> t)"
 abbreviation "shiftT \<equiv> shiftTI 0"
+
+lemma eval_trm_shiftTI: "length xs = b \<Longrightarrow>
+  Formula.eval_trm (xs @ z # v) (shiftTI b t) = Formula.eval_trm (xs @ v) t"
+  by (induction b t rule: shiftTI.induct) (auto simp: nth_append split: trm.splits)
 
 (* Rules taken from Formula that I take inspiration from
 lemma fvi_trm_plus: "x \<in> fvi_trm (b + c) t \<longleftrightarrow> x + c \<in> fvi_trm b t"
@@ -125,7 +136,64 @@ fun rewrite_4 where
 lemma shift_inc_fv: "x + b \<in> (Formula.fvi b \<phi>) \<longleftrightarrow> (x+b+1) \<in> (Formula.fvi b (shiftI b \<phi>))" sorry
 
 lemma shift_preserve_sat_aux: "length xs = b \<Longrightarrow>
-  Formula.sat \<sigma> V (xs @ v) i \<phi> = Formula.sat \<sigma> V (xs @ z # v) i (shiftI b \<phi>)" sorry
+  Formula.sat \<sigma> V (xs @ z # v) i (shiftI b \<phi>) = Formula.sat \<sigma> V (xs @ v) i \<phi>"
+proof (induction \<phi>)
+  case (Pred r ts)
+  then have map_eval_trm: "map (Formula.eval_trm (xs @ z # v) \<circ> (shiftTI b)) ts =
+    map (Formula.eval_trm (xs @ v)) ts"
+    using eval_trm_shiftTI
+    by simp
+  show ?case
+    by (auto simp: map_eval_trm split: option.splits)
+next
+  case (Let x1 x2 \<phi>1 \<phi>2)
+  then show ?case sorry
+next
+  case (Eq x1 x2)
+  then show ?case sorry
+next
+  case (Less x1 x2)
+  then show ?case sorry
+next
+  case (LessEq x1 x2)
+  then show ?case sorry
+next
+  case (Neg \<phi>)
+  then show ?case sorry
+next
+  case (Or \<phi>1 \<phi>2)
+  then show ?case sorry
+next
+  case (And \<phi>1 \<phi>2)
+  then show ?case sorry
+next
+  case (Ands x)
+  then show ?case sorry
+next
+  case (Exists \<phi>)
+  then show ?case sorry
+next
+  case (Agg x1 x2 x3 x4 \<phi>)
+  then show ?case sorry
+next
+  case (Prev x1 \<phi>)
+  then show ?case sorry
+next
+  case (Next x1 \<phi>)
+  then show ?case sorry
+next
+  case (Since \<phi>1 x2 \<phi>2)
+  then show ?case sorry
+next
+  case (Until \<phi>1 x2 \<phi>2)
+  then show ?case sorry
+next
+  case (MatchF x1 x2)
+  then show ?case sorry
+next
+  case (MatchP x1 x2)
+  then show ?case sorry
+qed
 
 
 lemma shift_preserve_sat:
