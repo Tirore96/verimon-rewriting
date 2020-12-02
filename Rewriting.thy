@@ -246,47 +246,14 @@ next
   then show ?case sorry
 qed auto
 
-(*
-  case (Pred r ts)
-  then have map_lemma: "map (Formula.eval_trm (xs @ z # v) \<circ> shiftTI b) ts =
-                        map (Formula.eval_trm (z # xs @ v) \<circ> shiftTI 0) ts" by (simp add: shift_inter_t)
-  show ?case by (auto simp: map_lemma split: option.splits)
-next
-  case c_top: (Let p b' \<phi> \<psi>)
-  then consider (1) "(Formula.nfv \<phi>) \<noteq> 0 \<and>  b \<ge> Formula.nfv \<phi>"
-               |(2) "(Formula.nfv \<phi>) = 0 \<and>  b \<ge> Formula.nfv \<phi>"
-               |(3) "(Formula.nfv \<phi>) \<noteq> 0 \<and>  b < Formula.nfv \<phi>"
-               |(4) "(Formula.nfv \<phi>) = 0 \<and>  b < Formula.nfv \<phi>" by linarith
-  then show "?case"
-  proof cases
-    case 1
-    then show ?thesis using shift_nfv_inc[OF a] sorry
-  next
-    case 2
-    then have L: "(Formula.nfv \<phi>) = 0 \<or> b < Formula.nfv \<phi> " by auto
-    from 2 have L2: "\<And>v. (\<exists>zs. length zs = b' \<and>
-                     Formula.sat \<sigma> V (zs @ v) i (shiftI b \<phi>)) \<longleftrightarrow>  
-                          (\<exists>zs. length zs = b' \<and> Formula.sat \<sigma> V (zs @ v) i (shiftI 0 \<phi>)) " sorry
-    from 2 show ?thesis using shift_nfv_eq[OF L] sorry
-  next
-    case 3
-    then show ?thesis sorry
-  next 
-    case 4
-    then have L: "Formula.nfv \<phi> = 0 \<or> b < Formula.nfv \<phi>" by auto
-    from 4 and c_top show ?thesis using shift_nfv_eq[OF L] 
-          and shift_exists[where b'="b'" and \<sigma>="\<sigma>" and V="V" and b="b" and \<phi>="\<phi>"] 
-      by (auto simp add: shift_nfv_0 )
-  qed 
-*)
-
 lemma sat_shift: " length xs = b \<Longrightarrow> Formula.sat \<sigma> V (xs @ z # v) i (shiftI b \<phi>) = Formula.sat \<sigma> V (xs@v) i \<phi>"
 proof -
   assume L: "length xs = b"
   then have B0:"Formula.sat \<sigma> V (xs @ z # v) i (shiftI b \<phi>) = Formula.sat \<sigma> V (z # xs @ v) i (shiftI 0 \<phi>)" 
     using shift_inter_f[where b=0 and k="b"] by auto
-  have "Formula.sat \<sigma> V (z # xs @ v) i (shiftI 0 \<phi>) = Formula.sat \<sigma> V (xs @ v) i \<phi>" sorry
-  oops
+  have S:"Formula.sat \<sigma> V (z # xs @ v) i (shiftI 0 \<phi>) = Formula.sat \<sigma> V (xs @ v) i \<phi>" by (auto simp: first_shift)
+  from L show ?thesis by (auto simp: B0 S)
+qed
 
 (*
 
