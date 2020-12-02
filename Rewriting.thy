@@ -153,18 +153,18 @@ lemma nfv_shift_suc_b: "Formula.fv \<phi> \<noteq> {} \<Longrightarrow> Formula.
 lemma nfv_shift_high_nfv: "Formula.fv \<phi> \<noteq> {} \<Longrightarrow> Formula.nfv \<phi> > Suc b \<Longrightarrow>  Formula.nfv (shiftI (Suc b) \<phi>) = Formula.nfv (shiftI b \<phi>) " sorry
 
 
-lemma shift_inter_t: "length xs = b \<Longrightarrow>
-                 Formula.eval_trm (xs @ x # z # v) (shiftTI (Suc b) t) =
-                 Formula.eval_trm (xs @ z # x # v) (shiftTI b t)" by (induction t;auto simp: nth_append)
+lemma shift_inter_t: "length xs = b \<Longrightarrow> length ys = k \<Longrightarrow> 
+                 Formula.eval_trm (xs @ ys @ z # v) (shiftTI (b + k) t) =
+                 Formula.eval_trm (xs @ z # ys @ v) (shiftTI b t)" by (induction t;auto simp: nth_append)
 
-lemma shift_inter_f: "length xs = b \<Longrightarrow>
-                 Formula.sat \<sigma> V (xs @ x # z # v) i (shiftI (Suc b) \<phi>) =
-                 Formula.sat \<sigma> V (xs @ z # x # v) i (shiftI b \<phi>)"
-  using shift_inter_t proof(induction \<phi> arbitrary: V xs z v i b)
+lemma shift_inter_f: "length xs = b \<Longrightarrow> length ys = k \<Longrightarrow>
+                 Formula.sat \<sigma> V (xs @ ys @ z # v) i (shiftI (b + k) \<phi>) =
+                 Formula.sat \<sigma> V (xs @ z # ys @ v) i (shiftI b \<phi>)"
+  using shift_inter_t proof(induction \<phi> )
 case (Pred r ts)
-  then have map_lemma: "map (Formula.eval_trm (xs @ x # z # v) \<circ> shiftTI (Suc b)) ts =
-                        map (Formula.eval_trm (xs @ z # x # v) \<circ> shiftTI b) ts" by (simp add: shift_inter_t)
-  show ?case by (auto simp: map_lemma split: option.splits)
+  then have map_lemma: "map (Formula.eval_trm (xs @ ys @ z # v) \<circ> shiftTI (b + k)) ts =
+                        map (Formula.eval_trm (xs @ z # ys @ v) \<circ> shiftTI b) ts" by (simp add: shift_inter_t)
+  show ?case by (auto simp: map_lemma split: option.splits) 
 next
   case let_case: (Let p b' \<phi> \<psi>)
   then show ?case 
@@ -214,6 +214,37 @@ next
 qed simp_all
 
 
+lemma first_shift: "Formula.sat \<sigma> V (z # xs @ v) i (shiftI 0 \<phi>) = Formula.sat \<sigma> V (xs @ v) i \<phi>"
+using eval_trm_shiftTI[of "[]"] proof(induction \<phi> arbitrary: V xs) (*arbitrary because of Let*)
+  case (Pred r ts)
+  then have map_lemma: "map (Formula.eval_trm (z # xs @ v) \<circ> shiftTI 0) ts
+                        = map (Formula.eval_trm (xs @ v)) ts " by auto
+  then show ?case by (auto split:option.splits simp: map_lemma)
+next
+  case ex: (Exists \<phi>)
+  from ex show ?case using shift_inter_f[where xs="[]" and ys="[_]"] and ex.IH[where xs="_#xs"] by auto
+next
+  case (Agg x1 x2 x3 x4 \<phi>)
+  then show ?case sorry
+next
+  case (Prev x1 \<phi>)
+then show ?case sorry
+next
+  case (Next x1 \<phi>)
+  then show ?case sorry
+next
+  case (Since \<phi>1 x2 \<phi>2)
+  then show ?case sorry
+next
+case (Until \<phi>1 x2 \<phi>2)
+  then show ?case sorry
+next
+  case (MatchF I r)
+  then show ?case sorry
+next
+  case (MatchP x1 x2)
+  then show ?case sorry
+qed auto
 
 (*
   case (Pred r ts)
@@ -249,7 +280,16 @@ next
   qed 
 *)
 
-lemma sat_shift: "length xs = b \<Longrightarrow> Formula.sat \<sigma> V (xs @ z # v) i (shiftI b \<phi>) = Formula.sat \<sigma> V (xs@v) i \<phi>"
+lemma sat_shift: " length xs = b \<Longrightarrow> Formula.sat \<sigma> V (xs @ z # v) i (shiftI b \<phi>) = Formula.sat \<sigma> V (xs@v) i \<phi>"
+proof -
+  assume L: "length xs = b"
+  then have B0:"Formula.sat \<sigma> V (xs @ z # v) i (shiftI b \<phi>) = Formula.sat \<sigma> V (z # xs @ v) i (shiftI 0 \<phi>)" 
+    using shift_inter_f[where b=0 and k="b"] by auto
+  have "Formula.sat \<sigma> V (z # xs @ v) i (shiftI 0 \<phi>) = Formula.sat \<sigma> V (xs @ v) i \<phi>" sorry
+  oops
+
+(*
+
 using eval_trm_shiftTI proof(induction \<phi> arbitrary: v)
   case (Pred r ts)
 
@@ -262,7 +302,7 @@ next
   then show ?case sorry      
 next
   case (Exists \<phi>)
-  then show ?case sorry 
+  then show ?case sorry (* use shift_inter later here*)
 next
   case (Agg x1 x2 x3 x4 \<phi>)
   then show ?case sorry
@@ -284,13 +324,13 @@ next
 next
   case (MatchP x1 x2)
   then show ?case sorry
-qed simp_all
+qed simp_all*)
   
 
 (*"\<alpha> \<and> \<exists>x. \<beta> = \<exists>x. (shift \<alpha>) \<and> \<beta>" *)
 lemma sat_rewrite_4: "Formula.sat \<sigma> V v i (Formula.And \<alpha> (Formula.Exists \<beta>)) = 
                     Formula.sat \<sigma> V v i (Formula.Exists (Formula.And (shift \<alpha>) \<beta> ))"
-using sat_shift[of "[]"]  by auto
+using shift_inter_f[where b=0 and k=0]  sorry
 
 
 (*
