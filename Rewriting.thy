@@ -2,7 +2,6 @@
     imports "MFODL_Monitor_Optimized.Formula" "MFODL_Monitor_Optimized.Regex"
 begin
 
-
 (*
 definition propagate_cond where
   "propagate_cond f1 f2 =
@@ -12,7 +11,6 @@ definition propagate_cond where
       in  (rr1 \<inter> (fv2 \<setminus> rr2)) \<supset> \<emptyset> )"
 *)
 
-thm Let_def
 lemma sat_1:
   "Formula.sat \<sigma> V v i (Formula.And a (Formula.Or b g)) =
    Formula.sat \<sigma> V v i (Formula.Or (Formula.And a b) (Formula.And a g))"
@@ -21,6 +19,8 @@ lemma sat_1:
 lemma sat_rewrite_5: "Formula.sat \<sigma> V v i (Formula.And a (Formula.Neg b))  = 
                       Formula.sat \<sigma> V v i (Formula.And a (Formula.Neg (Formula.And a b)))"
   by auto
+
+(*------------setup for proving set_rewrite_4----------------------------*)
 
 fun shiftTI :: "nat \<Rightarrow> Formula.trm \<Rightarrow> Formula.trm" where
  "shiftTI k (Formula.Var i) = (if i < k then Formula.Var i 
@@ -35,29 +35,17 @@ fun shiftTI :: "nat \<Rightarrow> Formula.trm \<Rightarrow> Formula.trm" where
 | "shiftTI k (Formula.I2f t) = Formula.I2f (shiftTI k t)"
 | "shiftTI k (Formula.Const n) = (Formula.Const n)"
 
-(*abbreviation "shiftT \<equiv> shiftTI 0"*)
 lemma eval_trm_shiftTI: "length xs = b \<Longrightarrow>
   Formula.eval_trm (xs @ z # v) (shiftTI b t) = Formula.eval_trm (xs @ v) t"
   by (induct b t rule: shiftTI.induct) (auto simp: nth_append split: trm.splits)
 
-(* Rules taken from Formula that I take inspiration from
-lemma fvi_trm_plus: "x \<in> fvi_trm (b + c) t \<longleftrightarrow> x + c \<in> fvi_trm b t"
-  by (induction t) auto
-
-lemma fvi_trm_iff_fv_trm: "x \<in> fvi_trm b t \<longleftrightarrow> x + b \<in> fv_trm t"
-  using fvi_trm_plus[where b=0 and c=b] by simp_all
-*)
-
 lemma shift_fv_in_t: "x+1 \<in> Formula.fvi_trm b (shiftTI b t) \<longleftrightarrow> x  \<in> Formula.fvi_trm b t" 
    by (induction t;auto)
-
-
-    
 
 primrec shiftI :: "nat \<Rightarrow> Formula.formula \<Rightarrow> Formula.formula" where
   "shiftI k (Formula.Pred r ts) = Formula.Pred r (map (shiftTI k) ts)"
 | "shiftI k (Formula.Exists a) = Formula.Exists (shiftI (Suc k) a)"
-| "shiftI k (Formula.Let nm n a b) = Formula.Let nm n a (shiftI k b)" (*fix error a is not shifted*)
+| "shiftI k (Formula.Let nm n a b) = Formula.Let nm n a (shiftI k b)" (*fixed error, a is not shifted*)
 | "shiftI k (Formula.Eq t1 t2) = Formula.Eq (shiftTI k t1) (shiftTI k t2)"
 | "shiftI k (Formula.Less t1 t2) =  Formula.Less (shiftTI k t1) (shiftTI k t2)"
 | "shiftI k (Formula.LessEq t1 t2) = Formula.LessEq (shiftTI k t1) (shiftTI k t2)"
@@ -76,7 +64,7 @@ primrec shiftI :: "nat \<Rightarrow> Formula.formula \<Rightarrow> Formula.formu
 
 
 abbreviation shift where "shift \<equiv> shiftI 0"
-(*Sequence of lemmas I think is needed to finally show sat_rewrite_4 *)
+
 lemma shift_fv_in_f: "(x+1) \<in> (Formula.fvi b (shiftI b \<phi>)) \<longleftrightarrow> x \<in> (Formula.fvi b \<phi>)" 
 using shift_fv_in_t proof (induction b \<phi> rule: fvi.induct)
   case (16 b I r)
@@ -85,74 +73,7 @@ next
   case (17 b I r)
   then show ?case by (induct r;auto)
 qed (auto)
-
-lemma shift_fv_notin_t: "x+1 \<notin> Formula.fvi_trm b (shiftTI b t) \<longleftrightarrow> x  \<notin> Formula.fvi_trm b t" 
-  by (induction t;auto)
-
-lemma shift_fv_notin_f: "(x+1) \<notin> (Formula.fvi b (shiftI b \<phi>)) \<longleftrightarrow> x \<notin> (Formula.fvi b \<phi>)" 
-using shift_fv_notin_t proof (induction b \<phi> rule: fvi.induct)
-  case (16 b I r)
-  then show ?case by (induct r;auto)
-next
-  case (17 b I r)
-  then show ?case by (induct r;auto)
-qed (auto)
-
-lemma fv_trm_shift_fv_empty: "Formula.fv_trm t = {} \<Longrightarrow>  Formula.fv_trm (shiftTI (Suc b) t) = Formula.fv_trm (shiftTI b t) "
-  by (induction t;auto)
-
-
-lemma fvi_trm_empty_shift_id: "Formula.fvi_trm b t = {} \<Longrightarrow> b \<le> b' \<Longrightarrow> shiftTI b' t = t"
-  by (induction t;auto split:if_splits)
-
-(*lemma map_idI: "(\<And>x. x \<in> set xs \<Longrightarrow> f x = x) \<Longrightarrow> map f xs = xs"
-by (induct xs, auto)*)
-
-(*prove this more general lemma, to later show nfv_shift_fv_empty*)
-lemma fvi_empty_shift_id: "Formula.fvi b \<phi> = {} \<Longrightarrow> b \<le> b' \<Longrightarrow> shiftI b' \<phi> = \<phi>"
-proof(induction \<phi> arbitrary: b b')
-  case (Pred r ts)
-  then show ?case using fvi_trm_empty_shift_id[where b="b" and b'="b'"] by (auto simp: map_idI) (*same as below*)
-next
-  case ands: (Ands xs)
-  then show ?case using ands.IH[where b="b" and b'="b'"] by (auto simp: map_idI) (*must instansiate b and b' for map_idI to kick in*)
-next
-  case (Exists \<phi>)
-  then show ?case  by (auto simp: fvi_trm_empty_shift_id)
-next
-  case (MatchF I r)
-  then show ?case by (induction r;auto)
-next
-  case (MatchP I r)
-  then show ?case by (induction r;auto)
-qed (auto simp: fvi_trm_empty_shift_id split:if_splits)
-
-lemma nfv_shift_fv_empty: "Formula.fv \<phi> = {} \<Longrightarrow>  Formula.nfv (shiftI (Suc b) \<phi>) = Formula.nfv (shiftI b \<phi>)"
-proof-
-  assume L: "Formula.fv \<phi> = {}"
-  then have LHS:"shiftI (Suc b) \<phi> = \<phi>" using fvi_empty_shift_id[where b=0 and b'="Suc b"] by auto
-  from L have RHS: "shiftI b \<phi> = \<phi>" using fvi_empty_shift_id[where b=0 and b'="b"] by auto
-  from LHS and RHS show ?thesis by auto
-qed
-
-
-lemma sat_shift_fv_empty: "Formula.fv \<phi> = {} \<Longrightarrow> Formula.sat \<sigma> V v i (shiftI (Suc b) \<phi>) =
-                                                 Formula.sat \<sigma> V v i (shiftI b \<phi>)" 
-proof-
-  assume L: "Formula.fv \<phi> = {}"
-  then have LHS:"shiftI (Suc b) \<phi> = \<phi>" using fvi_empty_shift_id[where b=0 and b'="Suc b"] by auto
-  from L have RHS: "shiftI b \<phi> = \<phi>" using fvi_empty_shift_id[where b=0 and b'="b"] by auto
-  from LHS and RHS show ?thesis by auto
-qed
-
-
-lemma nfv_shift_high_b: "Formula.fv \<phi> \<noteq> {} \<Longrightarrow> Formula.nfv \<phi> \<le> b \<Longrightarrow>  Formula.nfv (shiftI (Suc b) \<phi>) = Formula.nfv (shiftI b \<phi>) " sorry
-
-lemma nfv_shift_suc_b: "Formula.fv \<phi> \<noteq> {} \<Longrightarrow> Formula.nfv \<phi> = Suc b \<Longrightarrow>  Formula.nfv (shiftI (Suc b) \<phi>) + 1 = Formula.nfv (shiftI b \<phi>) " sorry
-
-lemma nfv_shift_high_nfv: "Formula.fv \<phi> \<noteq> {} \<Longrightarrow> Formula.nfv \<phi> > Suc b \<Longrightarrow>  Formula.nfv (shiftI (Suc b) \<phi>) = Formula.nfv (shiftI b \<phi>) " sorry
-
-
+(*
 lemma shift_inter_t: "length xs = b \<Longrightarrow> length ys = k \<Longrightarrow> 
                  Formula.eval_trm (xs @ ys @ z # v) (shiftTI (b + k) t) =
                  Formula.eval_trm (xs @ z # ys @ v) (shiftTI b t)" by (induction t;auto simp: nth_append)
@@ -160,62 +81,45 @@ lemma shift_inter_t: "length xs = b \<Longrightarrow> length ys = k \<Longrighta
 lemma shift_inter_f: "length xs = b \<Longrightarrow> length ys = k \<Longrightarrow>
                  Formula.sat \<sigma> V (xs @ ys @ z # v) i (shiftI (b + k) \<phi>) =
                  Formula.sat \<sigma> V (xs @ z # ys @ v) i (shiftI b \<phi>)"
-  using shift_inter_t proof(induction \<phi> )
+proof(induction \<phi> arbitrary: V xs b i) (*needed arb V for let, i for Prev*)
 case (Pred r ts)
   then have map_lemma: "map (Formula.eval_trm (xs @ ys @ z # v) \<circ> shiftTI (b + k)) ts =
                         map (Formula.eval_trm (xs @ z # ys @ v) \<circ> shiftTI b) ts" by (simp add: shift_inter_t)
   show ?case by (auto simp: map_lemma split: option.splits) 
 next
-  case let_case: (Let p b' \<phi> \<psi>)
+  case exists: (Exists \<phi>)
+  then show ?case using exists.IH[where xs= "_ # xs" and b="Suc b"] by (auto)
+next
+  case agg: (Agg x1 x2 x3 x4 \<phi>)
+  then show ?case using agg.IH sorry (*MEETING*)
+next
+  case prev: (Prev I \<phi>)
+  then show ?case by (auto split:nat.splits)
+next
+  case (MatchF I r)
   then show ?case 
-  proof (cases "Formula.fv \<phi> = {}")
-    case c: True
-    then show ?thesis using let_case.IH(2)[OF let_case.prems(1)] sorry (* by (auto simp: nfv_shift_fv_empty sat_shift_fv_empty) *)
+  proof (induction r)
+  case (Times r1 r2)
+  then show ?case sorry (*MEETING*)
   next
-    case False
-    then consider (1) " Formula.nfv \<phi> \<le>  b" | (2) "Formula.nfv \<phi> = Suc b" | (3) "Formula.nfv \<phi> > Suc b"
-      by linarith
-    then show ?thesis 
-    proof (cases)
-      case 1
-      then show ?thesis sorry
-    next
-      case 2
-      then show ?thesis sorry
-    next
-      case 3
-      then show ?thesis sorry 
-    qed
-  qed
-next
-  case (Exists \<phi>)
+  case (Star r)
   then show ?case sorry
+  qed auto
 next
-  case (Agg x1 x2 x3 x4 \<phi>)
+  case (MatchP I r)
+  then show ?case 
+  proof (induction r)
+  case (Times r1 r2)
   then show ?case sorry
-next
-  case (Prev x1 \<phi>)
+  next
+  case (Star r)
   then show ?case sorry
-next
-  case (Next x1 \<phi>)
-  then show ?case sorry
-next
-  case (Since \<phi>1 x2 \<phi>2)
-  then show ?case sorry
-next
-  case (Until \<phi>1 x2 \<phi>2)
-  then show ?case sorry
-next
-  case (MatchF x1 x2)
-  then show ?case sorry
-next
-  case (MatchP x1 x2)
-  then show ?case sorry
-qed simp_all
+  qed auto
+qed (auto simp: shift_inter_t)
 
 
 lemma first_shift: "Formula.sat \<sigma> V (z # xs @ v) i (shiftI 0 \<phi>) = Formula.sat \<sigma> V (xs @ v) i \<phi>"
-using eval_trm_shiftTI[of "[]"] proof(induction \<phi> arbitrary: V xs) (*arbitrary because of Let*)
+using eval_trm_shiftTI[of "[]"] proof(induction \<phi> arbitrary: V xs i) (*arbitrary because of Let*)
   case (Pred r ts)
   then have map_lemma: "map (Formula.eval_trm (z # xs @ v) \<circ> shiftTI 0) ts
                         = map (Formula.eval_trm (xs @ v)) ts " by auto
@@ -228,108 +132,84 @@ next
   then show ?case sorry
 next
   case (Prev x1 \<phi>)
-then show ?case sorry
-next
-  case (Next x1 \<phi>)
-  then show ?case sorry
-next
-  case (Since \<phi>1 x2 \<phi>2)
-  then show ?case sorry
-next
-case (Until \<phi>1 x2 \<phi>2)
-  then show ?case sorry
+then show ?case by (auto split:nat.splits)
 next
   case (MatchF I r)
-  then show ?case sorry
+  then show ?case 
+  proof(induction r)
+    case (Times r1 r2)
+    then show ?case sorry
+  next
+    case (Star r)
+    then show ?case sorry
+  qed auto
 next
-  case (MatchP x1 x2)
-  then show ?case sorry
+  case (MatchP I r)
+  then show ?case
+  proof(induction r)
+    case (Times r1 r2)
+    then show ?case sorry
+  next
+    case (Star r)
+    then show ?case sorry
+  qed auto
 qed auto
-
-lemma sat_shift: " length xs = b \<Longrightarrow> Formula.sat \<sigma> V (xs @ z # v) i (shiftI b \<phi>) = Formula.sat \<sigma> V (xs@v) i \<phi>"
+*)
+(*lemma sat_shift: " length xs = b \<Longrightarrow> Formula.sat \<sigma> V (xs @ z # v) i (shiftI b \<phi>) = Formula.sat \<sigma> V (xs@v) i \<phi>"
 proof -
   assume L: "length xs = b"
   then have B0:"Formula.sat \<sigma> V (xs @ z # v) i (shiftI b \<phi>) = Formula.sat \<sigma> V (z # xs @ v) i (shiftI 0 \<phi>)" 
     using shift_inter_f[where b=0 and k="b"] by auto
   have S:"Formula.sat \<sigma> V (z # xs @ v) i (shiftI 0 \<phi>) = Formula.sat \<sigma> V (xs @ v) i \<phi>" by (auto simp: first_shift)
   from L show ?thesis by (auto simp: B0 S)
-qed
+qed*)
 
-(*
 
-using eval_trm_shiftTI proof(induction \<phi> arbitrary: v)
-  case (Pred r ts)
 
-  then have map_lemma: "map (Formula.eval_trm (xs @ z # v) \<circ> shiftTI b) ts = 
-                        map (Formula.eval_trm (xs @ v)) ts" by auto
-  show ?case by (auto simp: map_lemma split:option.splits)
-next
-  case (Let p b \<phi> \<psi>)
-  have same_nfv: "Formula.nfv (Rewriting.shiftI 0 \<phi>) = Formula.nfv \<phi>" sorry
-  then show ?case sorry      
-next
-  case (Exists \<phi>)
-  then show ?case sorry (* use shift_inter later here*)
+lemma sat_shift: " length xs = b \<Longrightarrow> Formula.sat \<sigma> V (xs @ z # v) i (shiftI b \<phi>) = Formula.sat \<sigma> V (xs@v) i \<phi>"
+proof(induction \<phi> arbitrary: V i xs b)
+  case pred: (Pred r ts)
+  then have map_lemma: "map (Formula.eval_trm (xs @ z # v) \<circ> shiftTI (length xs)) ts
+             = map (Formula.eval_trm (xs @ v)) ts" by (auto simp:eval_trm_shiftTI) 
+  from pred show ?case by (auto split:option.splits simp:map_lemma)
+  case ex: (Exists \<phi>)
+  then show ?case using ex.IH[where xs= "_ # xs" and b="Suc b"] by (auto)
 next
   case (Agg x1 x2 x3 x4 \<phi>)
-  then show ?case sorry
+  then show ?case sorry (*meeting*)
 next
-  case (Prev I \<phi>)
-  then show ?case sorry
+  case (Prev x1 \<phi>)
+  then show ?case by (auto split:nat.splits)
 next
-  case (Next x1 \<phi>)
-  then show ?case sorry
+  case mf: (MatchF I r)
+  then show ?case
+  proof(induction r)
+    case times:(Times r1 r2)
+    then show ?case sorry (*meeting*)
+  next
+    case (Star r)
+    then show ?case sorry (*meeting*)
+  qed auto
 next
-  case (Since \<phi>1 x2 \<phi>2)
-  then show ?case sorry
-next
-  case (Until \<phi>1 x2 \<phi>2)
-  then show ?case sorry
-next
-  case (MatchF x1 x2)
-  then show ?case sorry
-next
-  case (MatchP x1 x2)
-  then show ?case sorry
-qed simp_all*)
-  
+  case (MatchP I r)
+  then show ?case
+  proof(induction r)
+    case (Times r1 r2)
+    then show ?case sorry
+  next
+    case (Star r)
+    then show ?case sorry
+  qed auto
+qed (auto simp: eval_trm_shiftTI)
+
+
 
 (*"\<alpha> \<and> \<exists>x. \<beta> = \<exists>x. (shift \<alpha>) \<and> \<beta>" *)
 lemma sat_rewrite_4: "Formula.sat \<sigma> V v i (Formula.And \<alpha> (Formula.Exists \<beta>)) = 
                     Formula.sat \<sigma> V v i (Formula.Exists (Formula.And (shift \<alpha>) \<beta> ))"
-using shift_inter_f[where b=0 and k=0]  sorry
+using sat_shift[of "[]"] by auto
 
 
-(*
-lemma shift_preserve_sat_aux: "length xs = b \<Longrightarrow>
-  Formula.sat \<sigma> V ( xs @ k # v) i (shiftI b \<phi>) = Formula.sat \<sigma> V (xs @ v) i \<phi>"
-proof (induction \<phi> arbitrary: xs k v b)
-  case (Pred r ts)
-  then have map_eval_trm: "map (Formula.eval_trm (xs @ k # v) \<circ> (shiftTI b)) ts =
-    map (Formula.eval_trm (xs @ v)) ts"
-    using eval_trm_shiftTI
-    by simp
-  show ?case
-    by (auto simp: map_eval_trm split: option.splits)
-next
-  case c: (Exists \<phi>) 
-    assume a0: "xs=xs'@[x']" 
-    assume a1: "b = length xs"
-    assume "Formula.sat \<sigma> V (z #xs @ k # v) i (shiftI (Suc b) \<phi>)"
-    then obtain z where Z: "Formula.sat \<sigma> V (z # xs @ k # v) i
-                            (shiftI  (Suc b) \<phi>)" by auto
-    from a0 and a1 and Z have LE: "Formula.sat \<sigma> V (z # xs' @ k # x' # v) i (shiftI b \<phi>)" 
-      using shift_lower_f[where xs="z#xs'"] by (auto;simp)
-    from c and Z and LE have "\<exists>z. Formula.sat \<sigma> V (z # xs @ v) i \<phi>" 
-      by (metis Cons_eq_appendI length_Cons)
-*)
 
-(*
-Lemmas that could be interesting in the future
-
-lemma fv_rewrite[simp]: "fv (rewrite \<phi>) = fv \<phi>"
-
-lemma "safe_formula \<phi> \<Longrightarrow> safe_formula (rewrite \<phi>)" 
-*)
 
 end
