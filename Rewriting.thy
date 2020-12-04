@@ -65,7 +65,7 @@ primrec shiftI :: "nat \<Rightarrow> Formula.formula \<Rightarrow> Formula.formu
 
 abbreviation shift where "shift \<equiv> shiftI 0"
 
-lemma shift_fv_in_f: "(x+1) \<in> (Formula.fvi b (shiftI b \<phi>)) \<longleftrightarrow> x \<in> (Formula.fvi b \<phi>)" 
+lemma shift_fv_in_f: "(x+1) \<in> (Formula.fvi b (shiftI b \<phi>)) \<longleftrightarrow> x \<in> (Formula.fvi b \<phi>)"
 using shift_fv_in_t proof (induction b \<phi> rule: fvi.induct)
   case (16 b I r)
   then show ?case by (induct r;auto)
@@ -171,7 +171,7 @@ lemma match_map_regex:
   using assms
   by (induction r) simp_all
 
-lemma sat_shift: " length xs = b \<Longrightarrow> Formula.sat \<sigma> V (xs @ z # v) i (shiftI b \<phi>) = Formula.sat \<sigma> V (xs@v) i \<phi>"
+lemma sat_shift: "length xs = b \<Longrightarrow> Formula.sat \<sigma> V (xs @ z # v) i (shiftI b \<phi>) = Formula.sat \<sigma> V (xs@v) i \<phi>"
 proof(induction \<phi> arbitrary: V i xs b)
   case pred: (Pred r ts)
   then have map_lemma: "map (Formula.eval_trm (xs @ z # v) \<circ> shiftTI (length xs)) ts
@@ -181,18 +181,26 @@ proof(induction \<phi> arbitrary: V i xs b)
   then show ?case using ex.IH[where xs= "_ # xs" and b="Suc b"] by (auto)
 next
   case (Agg x1 x2 x3 x4 \<phi>)
+  have rw11: "Formula.sat \<sigma> V (zs @ xs @ z # v) i (shiftI (b + x3) \<phi>) \<longleftrightarrow>
+    Formula.sat \<sigma> V (zs @ xs @ v) i \<phi>" if "length zs = x3" for zs
+    using Agg that
+    sorry
+  have rw12:
+    "Formula.eval_trm (zs @ xs @ z # v) (shiftTI (b + x3) x4) =
+    Formula.eval_trm (zs @ xs @ v) x4" if "length zs = x3" for zs
+    using eval_trm_shiftTI Agg(2) that
+    sorry
   have rw1: "\<And>x. {zs. length zs = x3 \<and>
       Formula.sat \<sigma> V (zs @ xs @ z # v) i (shiftI (b + x3) \<phi>) \<and>
       Formula.eval_trm (zs @ xs @ z # v) (shiftTI (b + x3) x4) = x} =
     {zs. length zs = x3 \<and>
       Formula.sat \<sigma> V (zs @ xs @ v) i \<phi> \<and> Formula.eval_trm (zs @ xs @ v) x4 = x}"
-    using Agg(1) eval_trm_shiftTI
-    sorry
+    using rw11 rw12 by auto
   have rw2: "fv (shiftI (b + x3) \<phi>) \<subseteq> {0..<x3} \<longleftrightarrow> fv \<phi> \<subseteq> {0..<x3}"
     sorry
   show ?case
     using Agg(2)
-    by (simp add: rw1 rw2 nth_append)
+    by (auto simp add: rw1 rw2 nth_append)
 next
   case (Prev x1 \<phi>)
   then show ?case by (auto split:nat.splits)
