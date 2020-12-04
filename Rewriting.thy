@@ -165,6 +165,11 @@ proof -
 qed*)
 
 
+lemma match_map_regex:
+  assumes "\<And>k a. a \<in> Regex.atms r \<Longrightarrow> sat k (f a) \<longleftrightarrow> sat' k a"
+  shows "Regex.match sat (regex.map_regex f r) = Regex.match sat' r"
+  using assms
+  by (induction r) simp_all
 
 lemma sat_shift: " length xs = b \<Longrightarrow> Formula.sat \<sigma> V (xs @ z # v) i (shiftI b \<phi>) = Formula.sat \<sigma> V (xs@v) i \<phi>"
 proof(induction \<phi> arbitrary: V i xs b)
@@ -176,30 +181,39 @@ proof(induction \<phi> arbitrary: V i xs b)
   then show ?case using ex.IH[where xs= "_ # xs" and b="Suc b"] by (auto)
 next
   case (Agg x1 x2 x3 x4 \<phi>)
-  then show ?case sorry (*meeting*)
+  have rw1: "\<And>x. {zs. length zs = x3 \<and>
+      Formula.sat \<sigma> V (zs @ xs @ z # v) i (shiftI (b + x3) \<phi>) \<and>
+      Formula.eval_trm (zs @ xs @ z # v) (shiftTI (b + x3) x4) = x} =
+    {zs. length zs = x3 \<and>
+      Formula.sat \<sigma> V (zs @ xs @ v) i \<phi> \<and> Formula.eval_trm (zs @ xs @ v) x4 = x}"
+    using Agg(1) eval_trm_shiftTI
+    sorry
+  have rw2: "fv (shiftI (b + x3) \<phi>) \<subseteq> {0..<x3} \<longleftrightarrow> fv \<phi> \<subseteq> {0..<x3}"
+    sorry
+  show ?case
+    using Agg(2)
+    by (simp add: rw1 rw2 nth_append)
 next
   case (Prev x1 \<phi>)
   then show ?case by (auto split:nat.splits)
 next
-  case mf: (MatchF I r)
-  then show ?case
-  proof(induction r)
-    case times:(Times r1 r2)
-    then show ?case sorry (*meeting*)
-  next
-    case (Star r)
-    then show ?case sorry (*meeting*)
-  qed auto
+  case (MatchF I r)
+  have rw: "\<And>j. Regex.match (Formula.sat \<sigma> V (xs @ z # v)) (regex.map_regex (shiftI b) r) =
+    Regex.match (Formula.sat \<sigma> V (xs @ v)) r"
+    apply (rule match_map_regex)
+    using MatchF
+    sorry
+  show ?case
+    by (simp add: rw)
 next
   case (MatchP I r)
-  then show ?case
-  proof(induction r)
-    case (Times r1 r2)
-    then show ?case sorry
-  next
-    case (Star r)
-    then show ?case sorry
-  qed auto
+  have rw: "\<And>j. Regex.match (Formula.sat \<sigma> V (xs @ z # v)) (regex.map_regex (shiftI b) r) =
+    Regex.match (Formula.sat \<sigma> V (xs @ v)) r"
+    apply (rule match_map_regex)
+    using MatchP
+    sorry
+  show ?case
+    by (simp add: rw)
 qed (auto simp: eval_trm_shiftTI)
 
 
