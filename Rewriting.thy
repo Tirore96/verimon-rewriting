@@ -165,10 +165,8 @@ proof -
 qed*)
 
 
-lemma match_map_regex:
-  assumes "\<And>k a. a \<in> Regex.atms r \<Longrightarrow> sat k (f a) \<longleftrightarrow> sat' k a"
-  shows "Regex.match sat (regex.map_regex f r) = Regex.match sat' r"
-  using assms
+lemma match_map_regex: "(\<And>k a. a \<in> Regex.atms r \<Longrightarrow> sat k (f a) \<longleftrightarrow> sat' k a) \<Longrightarrow>
+  Regex.match sat (regex.map_regex f r) = Regex.match sat' r"
   by (induction r) simp_all
 
 lemma sat_shift: "length xs = b \<Longrightarrow> Formula.sat \<sigma> V (xs @ z # v) i (shiftI b \<phi>) = Formula.sat \<sigma> V (xs@v) i \<phi>"
@@ -183,13 +181,13 @@ next
   case (Agg x1 x2 x3 x4 \<phi>)
   have rw11: "Formula.sat \<sigma> V (zs @ xs @ z # v) i (shiftI (b + x3) \<phi>) \<longleftrightarrow>
     Formula.sat \<sigma> V (zs @ xs @ v) i \<phi>" if "length zs = x3" for zs
-    using Agg that
-    sorry
+    using Agg(1)[of "zs @ xs"] Agg(2) that
+    by simp
   have rw12:
     "Formula.eval_trm (zs @ xs @ z # v) (shiftTI (b + x3) x4) =
     Formula.eval_trm (zs @ xs @ v) x4" if "length zs = x3" for zs
-    using eval_trm_shiftTI Agg(2) that
-    sorry
+    using eval_trm_shiftTI[of "zs @ xs"] Agg(2) that
+    by simp
   have rw1: "\<And>x. {zs. length zs = x3 \<and>
       Formula.sat \<sigma> V (zs @ xs @ z # v) i (shiftI (b + x3) \<phi>) \<and>
       Formula.eval_trm (zs @ xs @ z # v) (shiftTI (b + x3) x4) = x} =
@@ -197,6 +195,7 @@ next
       Formula.sat \<sigma> V (zs @ xs @ v) i \<phi> \<and> Formula.eval_trm (zs @ xs @ v) x4 = x}"
     using rw11 rw12 by auto
   have rw2: "fv (shiftI (b + x3) \<phi>) \<subseteq> {0..<x3} \<longleftrightarrow> fv \<phi> \<subseteq> {0..<x3}"
+    using (*fvi_iff_fv*) shift_fv_in_f
     sorry
   show ?case
     using Agg(2)
@@ -206,12 +205,13 @@ next
   then show ?case by (auto split:nat.splits)
 next
   case (MatchF I r)
-  have rw: "\<And>j. Regex.match (Formula.sat \<sigma> V (xs @ z # v)) (regex.map_regex (shiftI b) r) =
+  have rw: "Regex.match (Formula.sat \<sigma> V (xs @ z # v)) (regex.map_regex (shiftI b) r) =
     Regex.match (Formula.sat \<sigma> V (xs @ v)) r"
     apply (rule match_map_regex)
     using MatchF
-    sorry
+    by auto
   show ?case
+    using MatchF
     by (simp add: rw)
 next
   case (MatchP I r)
@@ -219,7 +219,7 @@ next
     Regex.match (Formula.sat \<sigma> V (xs @ v)) r"
     apply (rule match_map_regex)
     using MatchP
-    sorry
+    by auto
   show ?case
     by (simp add: rw)
 qed (auto simp: eval_trm_shiftTI)
