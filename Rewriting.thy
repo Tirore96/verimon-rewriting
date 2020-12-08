@@ -73,97 +73,53 @@ next
   case (17 b I r)
   then show ?case by (induct r;auto)
 qed (auto)
-(*
-lemma shift_inter_t: "length xs = b \<Longrightarrow> length ys = k \<Longrightarrow> 
-                 Formula.eval_trm (xs @ ys @ z # v) (shiftTI (b + k) t) =
-                 Formula.eval_trm (xs @ z # ys @ v) (shiftTI b t)" by (induction t;auto simp: nth_append)
-
-lemma shift_inter_f: "length xs = b \<Longrightarrow> length ys = k \<Longrightarrow>
-                 Formula.sat \<sigma> V (xs @ ys @ z # v) i (shiftI (b + k) \<phi>) =
-                 Formula.sat \<sigma> V (xs @ z # ys @ v) i (shiftI b \<phi>)"
-proof(induction \<phi> arbitrary: V xs b i) (*needed arb V for let, i for Prev*)
-case (Pred r ts)
-  then have map_lemma: "map (Formula.eval_trm (xs @ ys @ z # v) \<circ> shiftTI (b + k)) ts =
-                        map (Formula.eval_trm (xs @ z # ys @ v) \<circ> shiftTI b) ts" by (simp add: shift_inter_t)
-  show ?case by (auto simp: map_lemma split: option.splits) 
-next
-  case exists: (Exists \<phi>)
-  then show ?case using exists.IH[where xs= "_ # xs" and b="Suc b"] by (auto)
-next
-  case agg: (Agg x1 x2 x3 x4 \<phi>)
-  then show ?case using agg.IH sorry (*MEETING*)
-next
-  case prev: (Prev I \<phi>)
-  then show ?case by (auto split:nat.splits)
-next
-  case (MatchF I r)
-  then show ?case 
-  proof (induction r)
-  case (Times r1 r2)
-  then show ?case sorry (*MEETING*)
-  next
-  case (Star r)
-  then show ?case sorry
-  qed auto
-next
-  case (MatchP I r)
-  then show ?case 
-  proof (induction r)
-  case (Times r1 r2)
-  then show ?case sorry
-  next
-  case (Star r)
-  then show ?case sorry
-  qed auto
-qed (auto simp: shift_inter_t)
 
 
-lemma first_shift: "Formula.sat \<sigma> V (z # xs @ v) i (shiftI 0 \<phi>) = Formula.sat \<sigma> V (xs @ v) i \<phi>"
-using eval_trm_shiftTI[of "[]"] proof(induction \<phi> arbitrary: V xs i) (*arbitrary because of Let*)
+lemma no_shift_t:  "b' \<le> x3 \<Longrightarrow> Formula.fvi_trm b' (shiftTI (b + x3) t) \<subseteq> {0..<x3-b'} \<longleftrightarrow> Formula.fvi_trm b' t \<subseteq> {0..<x3-b'}"
+  by (induction t; auto)
+
+lemma no_shift:  "b' \<le> x3 \<Longrightarrow> Formula.fvi b' (shiftI (b + x3) \<phi>) \<subseteq> {0..<x3-b'} \<longleftrightarrow> Formula.fvi b' \<phi> \<subseteq> {0..<x3-b'}" (*MEETING: Do we want if on the top-lemma level?*)
+proof(induction \<phi> arbitrary: b' x3)
+  case (Ands x)
+  from Ands(1)[where b'=b'] and Ands(2)  show ?case by auto (*MEETING: why do I have to instansiate b'?*)
+next
   case (Pred r ts)
-  then have map_lemma: "map (Formula.eval_trm (z # xs @ v) \<circ> shiftTI 0) ts
-                        = map (Formula.eval_trm (xs @ v)) ts " by auto
-  then show ?case by (auto split:option.splits simp: map_lemma)
+  thm no_shift_t[OF Pred(1)]
+  then have helper: "((\<Union>a\<in>set ts. Formula.fvi_trm b' (shiftTI (b + x3) a)) \<subseteq> {0..<x3 - b'}) = 
+                     (\<Union> (Formula.fvi_trm b' ` set ts) \<subseteq> {0..<x3 - b'})" using no_shift_t[OF Pred(1)] by (auto;simp)
+  from Pred helper show ?case by auto
 next
-  case ex: (Exists \<phi>)
-  from ex show ?case using shift_inter_f[where xs="[]" and ys="[_]"] and ex.IH[where xs="_#xs"] by auto
+  case (Exists \<phi>)
+  from Exists(2) have suc_lemma: "Suc b' \<le> Suc x3" by simp
+  from Exists(1)[OF suc_lemma] show ?case by simp
 next
-  case (Agg x1 x2 x3 x4 \<phi>)
-  then show ?case sorry
-next
-  case (Prev x1 \<phi>)
-then show ?case by (auto split:nat.splits)
+  case (Agg xy op bb t \<phi>)
+  from Agg(2) have plusbb: "b' + bb \<le> x3+bb" by simp
+  from Agg(1)[OF plusbb] have helper1: "(Formula.fvi (b' + bb) (shiftI (b + (x3 + bb)) \<phi>)) \<subseteq> {0..<x3 - b'} =
+                 ((Formula.fvi (b' + bb) \<phi>)  \<subseteq> {0..<x3 - b'})" by simp
+
+
+  from no_shift_t[OF plusbb] have helper2: "(Formula.fvi_trm (b' + bb) (shiftTI (b + (x3 + bb)) t) \<subseteq> {0..<x3 - b'}) =
+                                            (Formula.fvi_trm (b' + bb) t \<subseteq> {0..<x3 - b'}) " by simp
+ 
+  from plusbb have helper3: "((if b' \<le> (if xy < b + x3 then xy else xy + 1) then {(if xy < b + x3 then xy else xy + 1) - b'} else {}) \<subseteq> {0..<x3 - b'}) =
+                 ((if b' \<le> xy then {xy - b'} else {}) \<subseteq> {0..<x3 - b'})" by auto
+
+  have helper: "(Formula.fvi (b' + bb) (shiftI (b + (x3 + bb)) \<phi>) \<union> 
+                Formula.fvi_trm (b' + bb) (shiftTI (b + (x3 + bb)) t) \<union>
+                (if b' \<le> (if xy < b + x3 then xy else xy + 1) then {(if xy < b + x3 then xy else xy + 1) - b'} else {}) \<subseteq> {0..<x3 - b'}) =
+                (Formula.fvi (b' + bb) \<phi> \<union> 
+                Formula.fvi_trm (b' + bb) t \<union> 
+                (if b' \<le> xy then {xy - b'} else {}) \<subseteq> {0..<x3 - b'})" by (simp add: helper1 helper2 helper3)
+  have assoc: "b + x3 + bb = b + (x3 + bb)" by simp
+  show ?case by (simp only: shiftI.simps fvi.simps helper assoc) (*'simp only' because we aim for the helper-lemma as the last goal*)
 next
   case (MatchF I r)
-  then show ?case 
-  proof(induction r)
-    case (Times r1 r2)
-    then show ?case sorry
-  next
-    case (Star r)
-    then show ?case sorry
-  qed auto
+  then show ?case by (induction r;auto)
 next
   case (MatchP I r)
-  then show ?case
-  proof(induction r)
-    case (Times r1 r2)
-    then show ?case sorry
-  next
-    case (Star r)
-    then show ?case sorry
-  qed auto
-qed auto
-*)
-(*lemma sat_shift: " length xs = b \<Longrightarrow> Formula.sat \<sigma> V (xs @ z # v) i (shiftI b \<phi>) = Formula.sat \<sigma> V (xs@v) i \<phi>"
-proof -
-  assume L: "length xs = b"
-  then have B0:"Formula.sat \<sigma> V (xs @ z # v) i (shiftI b \<phi>) = Formula.sat \<sigma> V (z # xs @ v) i (shiftI 0 \<phi>)" 
-    using shift_inter_f[where b=0 and k="b"] by auto
-  have S:"Formula.sat \<sigma> V (z # xs @ v) i (shiftI 0 \<phi>) = Formula.sat \<sigma> V (xs @ v) i \<phi>" by (auto simp: first_shift)
-  from L show ?thesis by (auto simp: B0 S)
-qed*)
-
+  then show ?case by (induction r;auto)
+qed (auto simp: no_shift_t)
 
 lemma match_map_regex: "(\<And>k a. a \<in> Regex.atms r \<Longrightarrow> sat k (f a) \<longleftrightarrow> sat' k a) \<Longrightarrow>
   Regex.match sat (regex.map_regex f r) = Regex.match sat' r"
@@ -175,8 +131,8 @@ proof(induction \<phi> arbitrary: V i xs b)
   then have map_lemma: "map (Formula.eval_trm (xs @ z # v) \<circ> shiftTI (length xs)) ts
              = map (Formula.eval_trm (xs @ v)) ts" by (auto simp:eval_trm_shiftTI) 
   from pred show ?case by (auto split:option.splits simp:map_lemma)
-  case ex: (Exists \<phi>)
-  then show ?case using ex.IH[where xs= "_ # xs" and b="Suc b"] by (auto)
+  case (Exists \<phi>)
+  then show ?case using Exists.IH[where xs= "_ # xs" and b="Suc b"] by (auto)
 next
   case (Agg x1 x2 x3 x4 \<phi>)
   have rw11: "Formula.sat \<sigma> V (zs @ xs @ z # v) i (shiftI (b + x3) \<phi>) \<longleftrightarrow>
@@ -194,9 +150,7 @@ next
     {zs. length zs = x3 \<and>
       Formula.sat \<sigma> V (zs @ xs @ v) i \<phi> \<and> Formula.eval_trm (zs @ xs @ v) x4 = x}"
     using rw11 rw12 by auto
-  have rw2: "fv (shiftI (b + x3) \<phi>) \<subseteq> {0..<x3} \<longleftrightarrow> fv \<phi> \<subseteq> {0..<x3}"
-    using (*fvi_iff_fv*) shift_fv_in_f
-    sorry
+  have rw2: "fv (shiftI (b + x3) \<phi>) \<subseteq> {0..<x3} \<longleftrightarrow> fv \<phi> \<subseteq> {0..<x3}" using no_shift[where b'=0] by (auto)
   show ?case
     using Agg(2)
     by (auto simp add: rw1 rw2 nth_append)
