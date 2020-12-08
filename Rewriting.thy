@@ -81,7 +81,8 @@ lemma no_shift_t:  "b' \<le> x3 \<Longrightarrow> Formula.fvi_trm b' (shiftTI (b
 lemma no_shift:  "b' \<le> x3 \<Longrightarrow> Formula.fvi b' (shiftI (b + x3) \<phi>) \<subseteq> {0..<x3-b'} \<longleftrightarrow> Formula.fvi b' \<phi> \<subseteq> {0..<x3-b'}" (*MEETING: Do we want if on the top-lemma level?*)
 proof(induction \<phi> arbitrary: b' x3)
   case (Ands x)
-  from Ands(1)[where b'=b'] and Ands(2)  show ?case by auto (*MEETING: why do I have to instansiate b'?*)
+  then show ?case
+    by fastforce (*MEETING: why do I have to instansiate b'? A: To obtain a faster proof by auto *)
 next
   case (Pred r ts)
   thm no_shift_t[OF Pred(1)]
