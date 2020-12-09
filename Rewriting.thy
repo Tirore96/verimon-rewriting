@@ -205,31 +205,64 @@ lemma sat_3_d: "Formula.sat \<sigma> V v i (Formula.Neg (Formula.Next I \<alpha>
                                                                         to push a negation closer to \<alpha>?*)
   by auto
 
-(*lemma sat_3_d_l: "Formula.sat \<sigma> V v i (Formula.Next I (Formula.Neg \<alpha>)) \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.Neg (Formula.Next I \<alpha>))"
+
+abbreviation diamond_b where "diamond_b I \<alpha> \<equiv> Formula.Since Formula.TT I \<alpha>"  
+abbreviation square_b where "square_b I \<alpha> \<equiv> Formula.Neg (diamond_b I (Formula.Neg \<alpha>))"  
+abbreviation diamond_w where "diamond_w I \<alpha> \<equiv> Formula.Until Formula.TT I \<alpha>"
+abbreviation square_w where "square_w I \<alpha> \<equiv> Formula.Neg (diamond_w I (Formula.Neg \<alpha>))"
+(*j \<le> i \<and> \<tau>i - \<tau>j \<in> \<I> \<and> 0 \<notin> \<I> \<longrightarrow> j < i \<and> \<tau>i - \<tau>j \<in> \<I> *)
+(*Left side more strict, requires j to be at most at a time point that's less than \<tau>i, meaning possibly a difference between
+j and i by k, since time stamps are monotonically increasing. The right side on the other hand, only requires a difference of 1 between
+i and j*)
+
+lemma sat_3_e1: "\<not> (mem 0 I) \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.Neg (diamond_w I \<alpha>)) = Formula.sat \<sigma> V v i (square_w I (Formula.Neg \<alpha>))" 
+  by simp
+
+lemma sat_3_e2: "\<not> (mem 0 I) \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.Neg (square_w I \<alpha>)) = Formula.sat \<sigma> V v i (diamond_w I (Formula.Neg \<alpha>))" 
   by auto
 
-lemma sat_3_d_r: " Formula.sat \<sigma> V v i (Formula.Neg (Formula.Next I \<alpha>)) \<Longrightarrow> \<not> (Formula.sat \<sigma> V v i (Formula.Next I (Formula.Neg \<alpha>)))"
-  apply (simp only: sat.simps)
-  
+lemma sat_3_e3: "\<not> (mem 0 I) \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.Neg (diamond_b I \<alpha>)) = Formula.sat \<sigma> V v i (square_b I (Formula.Neg \<alpha>))" 
+  by auto
 
-lemma sat_3_d: "Formula.sat \<sigma> V v i (Formula.Neg (Formula.Next I \<alpha>)) = Formula.sat \<sigma> V v i (Formula.Next I (Formula.Neg \<alpha>))" 
-proof (rule iffI;simp only: sat.simps)
-  assume ass: "\<not> (mem (\<tau> \<sigma> (Suc i) - \<tau> \<sigma> i) I \<and> Formula.sat \<sigma> V v (Suc i) \<alpha>)"
-  then have  de_morgan: "\<not> (mem (\<tau> \<sigma> (Suc i) - \<tau> \<sigma> i)) I \<or> \<not> (Formula.sat \<sigma> V v (Suc i) \<alpha>)" by blast
-  then have res: "mem (\<tau> \<sigma> (Suc i) - \<tau> \<sigma> i) I \<and> \<not> Formula.sat \<sigma> V v (Suc i) \<alpha>" try0
-  apply(simp only: de_morgan)
+lemma sat_3_e4: "\<not> (mem 0 I) \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.Neg (square_b I \<alpha>)) = Formula.sat \<sigma> V v i (diamond_b I (Formula.Neg \<alpha>))" 
+  by auto
 
-   apply(simp only: de_Morgan_disj)
-  
-  (*by (simp;auto;metis left_right linear of_nat_eq_enat of_nat_le_iff order_trans)*)
-  apply (auto simp add: not_le) (*MEETING: the first subgoal implying False, looks unsolvable, is that the case.
-                                           Applying auto followed by sledgehammer finds the proof
-                                           "metis left_right linear of_nat_eq_enat of_nat_le_iff order_tran" 
-                                           but when I use it the prover doesn't terminate. Could the rewrite be invalid?*)
-  sorry*)
+lemma sat_3_f1: "Formula.sat \<sigma> V v i (Formula.Neg (diamond_w I \<alpha>)) = Formula.sat \<sigma> V v i (square_w I (Formula.Neg \<alpha>))" 
+  by simp
 
- 
+lemma sat_3_f2: "Formula.sat \<sigma> V v i (Formula.Neg (square_w I \<alpha>)) = Formula.sat \<sigma> V v i (diamond_w I (Formula.Neg \<alpha>))" 
+  by auto
 
+lemma sat_3_f3: "Formula.sat \<sigma> V v i (Formula.Neg (diamond_b I \<alpha>)) = Formula.sat \<sigma> V v i (square_b I (Formula.Neg \<alpha>))" 
+  by auto
 
-  
+lemma sat_3_f4: "Formula.sat \<sigma> V v i (Formula.Neg (square_b I \<alpha>)) = Formula.sat \<sigma> V v i (diamond_b I (Formula.Neg \<alpha>))" 
+  by auto
+
+abbreviation release where "release \<beta> I \<gamma> \<equiv> Formula.Neg (Formula.Until (Formula.Neg \<beta>) I (Formula.Neg \<gamma>) )"
+abbreviation trigger where "trigger \<beta> I \<gamma> \<equiv> Formula.Neg (Formula.Since (Formula.Neg \<beta>) I (Formula.Neg \<gamma>) )"
+
+lemma sat_3_g1: "\<not> (mem 0 I) \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.Neg (Formula.Since \<beta> I \<gamma>)) = 
+                                 Formula.sat \<sigma> V v i (trigger (Formula.Neg \<beta>) I (Formula.Neg \<gamma>))" by simp
+
+lemma sat_3_g2: "\<not> (mem 0 I) \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.Neg (Formula.Until \<beta> I \<gamma>)) = 
+                                 Formula.sat \<sigma> V v i (release (Formula.Neg \<beta>) I (Formula.Neg \<gamma>))" by simp
+
+lemma sat_3_h1: "\<not> (mem 0 I) \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.Neg (trigger \<beta> I \<gamma>)) = 
+                                 Formula.sat \<sigma> V v i (Formula.Since (Formula.Neg \<beta>) I (Formula.Neg \<gamma>))" by auto
+
+lemma sat_3_h2: "\<not> (mem 0 I) \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.Neg (release \<beta> I \<gamma>)) = 
+                                 Formula.sat \<sigma> V v i (Formula.Until (Formula.Neg \<beta>) I (Formula.Neg \<gamma>))" by auto
+
+lemma sat_3_i1: "Formula.sat \<sigma> V v i (Formula.Neg (Formula.Since \<beta> I \<gamma>)) = 
+                 Formula.sat \<sigma> V v i (trigger (Formula.Neg \<beta>) I (Formula.Neg \<gamma>))" by auto
+
+lemma sat_3_i2: "Formula.sat \<sigma> V v i (Formula.Neg (Formula.Until \<beta> I \<gamma>)) = 
+                 Formula.sat \<sigma> V v i (release (Formula.Neg \<beta>) I (Formula.Neg \<gamma>))" by force
+
+lemma sat_3_j1: "Formula.sat \<sigma> V v i (Formula.Neg (trigger \<beta> I \<gamma>)) = 
+                 Formula.sat \<sigma> V v i (Formula.Since (Formula.Neg \<beta>) I (Formula.Neg \<gamma>))" by auto
+
+lemma sat_3_j2: "Formula.sat \<sigma> V v i (Formula.Neg (release \<beta> I \<gamma>)) = 
+                 Formula.sat \<sigma> V v i (Formula.Until (Formula.Neg \<beta>) I (Formula.Neg \<gamma>))" by auto
 end
