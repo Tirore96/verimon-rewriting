@@ -199,7 +199,13 @@ lemma sat_3_b: "Formula.sat \<sigma> V v i (Formula.Exists (shiftI 0 \<alpha>)) 
 lemma sat_3_c1: "Formula.sat \<sigma> V v i (Formula.Neg(Formula.Or \<alpha> \<beta>)) = Formula.sat \<sigma> V v i (Formula.And (Formula.Neg \<alpha>) (Formula.Neg \<beta>)) " by auto
 lemma sat_3_c2: "Formula.sat \<sigma> V v i (Formula.Neg(Formula.And \<alpha> \<beta>)) = Formula.sat \<sigma> V v i (Formula.Or (Formula.Neg \<alpha>) (Formula.Neg \<beta>)) " by auto
 
-lemma sat_3_d_l: "Formula.sat \<sigma> V v i (Formula.Next I (Formula.Neg \<alpha>)) \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.Neg (Formula.Next I \<alpha>))"
+lemma sat_3_d: "Formula.sat \<sigma> V v i (Formula.Neg (Formula.Next I \<alpha>)) =
+  Formula.sat \<sigma> V v i (Formula.Or (Formula.Neg (Formula.Next I Formula.TT))
+                                  (Formula.Next I (Formula.Neg \<alpha>)))"  (*MEETING: So we are bloating up the formula because we want
+                                                                        to push a negation closer to \<alpha>?*)
+  by auto
+
+(*lemma sat_3_d_l: "Formula.sat \<sigma> V v i (Formula.Next I (Formula.Neg \<alpha>)) \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.Neg (Formula.Next I \<alpha>))"
   by auto
 
 lemma sat_3_d_r: " Formula.sat \<sigma> V v i (Formula.Neg (Formula.Next I \<alpha>)) \<Longrightarrow> \<not> (Formula.sat \<sigma> V v i (Formula.Next I (Formula.Neg \<alpha>)))"
@@ -220,8 +226,10 @@ proof (rule iffI;simp only: sat.simps)
                                            Applying auto followed by sledgehammer finds the proof
                                            "metis left_right linear of_nat_eq_enat of_nat_le_iff order_tran" 
                                            but when I use it the prover doesn't terminate. Could the rewrite be invalid?*)
-  sorry
+  sorry*)
 
-  
+ 
+
+
   
 end
