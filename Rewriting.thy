@@ -189,18 +189,20 @@ using sat_shift[of "[]"] by auto
 
 
 (*Section 3 of Normalization chapter p. 79*)
-lemma sat_3_a: "Formula.sat \<sigma> V v i (Formula.Neg (Formula.Neg \<alpha>)) = Formula.sat \<sigma> V v i \<alpha>" by auto
-lemma sat_3_b: "Formula.sat \<sigma> V v i (Formula.Exists (shiftI 0 \<alpha>)) = Formula.sat \<sigma> V v i \<alpha>" using sat_shift[of "[]"] by auto
-lemma sat_3_c1: "Formula.sat \<sigma> V v i (Formula.Neg(Formula.Or \<alpha> \<beta>)) = Formula.sat \<sigma> V v i (Formula.And (Formula.Neg \<alpha>) (Formula.Neg \<beta>)) " by auto
-lemma sat_3_c2: "Formula.sat \<sigma> V v i (Formula.Neg(Formula.And \<alpha> \<beta>)) = Formula.sat \<sigma> V v i (Formula.Or (Formula.Neg \<alpha>) (Formula.Neg \<beta>)) " by auto
-lemma sat_3_d: "Formula.sat \<sigma> V v i (Formula.Neg (Formula.Next I \<alpha>)) = Formula.sat \<sigma> V v i (Formula.Next I (Formula.Neg \<alpha>))" 
-  (*by (simp;auto;metis left_right linear of_nat_eq_enat of_nat_le_iff order_trans)*)
-  apply (auto simp add: not_le) (*MEETING: the first subgoal implying False, looks unsolvable, is that the case.
-                                           Applying auto followed by sledgehammer finds the proof
-                                           "metis left_right linear of_nat_eq_enat of_nat_le_iff order_tran" 
-                                           but when I use it the prover doesn't terminate. Could the rewrite be invalid?*)
-  sorry
-
-  
+lemma sat_3_a: "Formula.sat \<sigma> V v i (Formula.Neg (Formula.Neg \<alpha>)) = Formula.sat \<sigma> V v i \<alpha>"
+  by auto
+lemma sat_3_b: "Formula.sat \<sigma> V v i (Formula.Exists (shiftI 0 \<alpha>)) = Formula.sat \<sigma> V v i \<alpha>"
+  using sat_shift[of "[]"]
+  by auto
+lemma sat_3_c1: "Formula.sat \<sigma> V v i (Formula.Neg(Formula.Or \<alpha> \<beta>)) =
+  Formula.sat \<sigma> V v i (Formula.And (Formula.Neg \<alpha>) (Formula.Neg \<beta>))"
+  by auto
+lemma sat_3_c2: "Formula.sat \<sigma> V v i (Formula.Neg(Formula.And \<alpha> \<beta>)) =
+  Formula.sat \<sigma> V v i (Formula.Or (Formula.Neg \<alpha>) (Formula.Neg \<beta>))"
+  by auto
+lemma sat_3_d: "Formula.sat \<sigma> V v i (Formula.Neg (Formula.Next I \<alpha>)) =
+  Formula.sat \<sigma> V v i (Formula.Or (Formula.Neg (Formula.Next I Formula.TT))
+                                  (Formula.Next I (Formula.Neg \<alpha>)))"
+  by auto
   
 end
