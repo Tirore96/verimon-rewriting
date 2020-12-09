@@ -186,6 +186,11 @@ lemma sat_rewrite_4: "Formula.sat \<sigma> V v i (Formula.And \<alpha> (Formula.
                     Formula.sat \<sigma> V v i (Formula.Exists (Formula.And (shift \<alpha>) \<beta> ))"
 using sat_shift[of "[]"] by auto
 
+(*Section 2 of Normalization*)
+lemma sat_2_1: "(\<forall>x. Formula.sat \<sigma> V (x#v) i \<alpha>) = Formula.sat \<sigma> V v i (Formula.Neg (Formula.Exists (Formula.Neg \<alpha>)))" by simp
+lemma sat_2_2: "(Formula.sat \<sigma> V v i \<alpha> \<longrightarrow> Formula.sat \<sigma> V v i \<beta>) = (Formula.sat \<sigma> V v i (Formula.Or (Formula.Neg \<alpha>) \<beta>))" by simp
+lemma sat_2_3: "(Formula.sat \<sigma> V v i \<alpha> \<longleftrightarrow> Formula.sat \<sigma> V v i \<beta>) = 
+                (Formula.sat \<sigma> V v i (Formula.And (Formula.Or (Formula.Neg \<alpha>) \<beta>)(Formula.Or (Formula.Neg \<beta>) \<alpha>)))" by auto
 
 
 (*Section 3 of Normalization chapter p. 79*)
@@ -193,7 +198,23 @@ lemma sat_3_a: "Formula.sat \<sigma> V v i (Formula.Neg (Formula.Neg \<alpha>)) 
 lemma sat_3_b: "Formula.sat \<sigma> V v i (Formula.Exists (shiftI 0 \<alpha>)) = Formula.sat \<sigma> V v i \<alpha>" using sat_shift[of "[]"] by auto
 lemma sat_3_c1: "Formula.sat \<sigma> V v i (Formula.Neg(Formula.Or \<alpha> \<beta>)) = Formula.sat \<sigma> V v i (Formula.And (Formula.Neg \<alpha>) (Formula.Neg \<beta>)) " by auto
 lemma sat_3_c2: "Formula.sat \<sigma> V v i (Formula.Neg(Formula.And \<alpha> \<beta>)) = Formula.sat \<sigma> V v i (Formula.Or (Formula.Neg \<alpha>) (Formula.Neg \<beta>)) " by auto
+
+lemma sat_3_d_l: "Formula.sat \<sigma> V v i (Formula.Next I (Formula.Neg \<alpha>)) \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.Neg (Formula.Next I \<alpha>))"
+  by auto
+
+lemma sat_3_d_r: " Formula.sat \<sigma> V v i (Formula.Neg (Formula.Next I \<alpha>)) \<Longrightarrow> \<not> (Formula.sat \<sigma> V v i (Formula.Next I (Formula.Neg \<alpha>)))"
+  apply (simp only: sat.simps)
+  
+
 lemma sat_3_d: "Formula.sat \<sigma> V v i (Formula.Neg (Formula.Next I \<alpha>)) = Formula.sat \<sigma> V v i (Formula.Next I (Formula.Neg \<alpha>))" 
+proof (rule iffI;simp only: sat.simps)
+  assume ass: "\<not> (mem (\<tau> \<sigma> (Suc i) - \<tau> \<sigma> i) I \<and> Formula.sat \<sigma> V v (Suc i) \<alpha>)"
+  then have  de_morgan: "\<not> (mem (\<tau> \<sigma> (Suc i) - \<tau> \<sigma> i)) I \<or> \<not> (Formula.sat \<sigma> V v (Suc i) \<alpha>)" by blast
+  then have res: "mem (\<tau> \<sigma> (Suc i) - \<tau> \<sigma> i) I \<and> \<not> Formula.sat \<sigma> V v (Suc i) \<alpha>" try0
+  apply(simp only: de_morgan)
+
+   apply(simp only: de_Morgan_disj)
+  
   (*by (simp;auto;metis left_right linear of_nat_eq_enat of_nat_le_iff order_trans)*)
   apply (auto simp add: not_le) (*MEETING: the first subgoal implying False, looks unsolvable, is that the case.
                                            Applying auto followed by sledgehammer finds the proof
