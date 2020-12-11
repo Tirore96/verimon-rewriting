@@ -198,7 +198,9 @@ lemma sat_3_e3: "excl_zero I \<Longrightarrow> Formula.sat \<sigma> V v i (Formu
 lemma sat_3_e4: "excl_zero I \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.Neg (square_b I \<alpha>)) = Formula.sat \<sigma> V v i (diamond_b I (Formula.Neg \<alpha>))" 
   by auto
 
-lemma sat_3_f1: "Formula.sat \<sigma> V v i (Formula.Neg (diamond_w I \<alpha>)) = Formula.sat \<sigma> V v i (square_w I (Formula.Neg \<alpha>))" 
+lemma sat_3_f1: "Formula.sat \<sigma> V v i (Formula.Neg (diamond_w I \<alpha>)) = Formula.sat \<sigma> V v i (square_w I (Formula.Neg \<alpha>))"
+(*  using sat_3 ...
+    apply (auto simp del: Formula.sat.simps) *)
   by simp
 
 lemma sat_3_f2: "Formula.sat \<sigma> V v i (Formula.Neg (square_w I \<alpha>)) = Formula.sat \<sigma> V v i (diamond_w I (Formula.Neg \<alpha>))" 
@@ -352,9 +354,13 @@ proof(rule iffI)
   assume A:?L
   then obtain j where j: "j\<le>i" "mem (\<tau> \<sigma> i - \<tau> \<sigma> j) I" "Formula.sat \<sigma> V v j \<gamma>"  "(\<forall>k\<in>{j<..i}. Formula.sat \<sigma> V v k \<beta>)" 
     by auto
+  have \<tau>_mono2: "j \<le> k \<Longrightarrow> k \<le> j' \<Longrightarrow> j' \<le> i \<Longrightarrow> \<tau> \<sigma> j' - \<tau> \<sigma> k \<le> \<tau> \<sigma> i - \<tau> \<sigma> j" for k j'
+    by (force dest: \<tau>_mono[of _ _ \<sigma>])
  from j(2) have B1: "mem (\<tau> \<sigma> i - \<tau> \<sigma> j) (inite (right I))" using in_interval by blast
   from A j(1,2) have B2: "\<And>k. k \<in>{j<..i} \<Longrightarrow>
-                         (\<And>j'. j' \<in> {k..i} \<Longrightarrow> (\<tau> \<sigma> j' - \<tau> \<sigma> k) \<le> (\<tau> \<sigma> i - \<tau> \<sigma> j))"  sorry
+                         (\<And>j'. j' \<in> {k..i} \<Longrightarrow> (\<tau> \<sigma> j' - \<tau> \<sigma> k) \<le> (\<tau> \<sigma> i - \<tau> \<sigma> j))"
+    using \<tau>_mono2
+    by auto
   from A B1 B2 have B3: "\<And>k. k \<in>{j<..i} \<Longrightarrow>
                            (\<exists>j'\<ge>k. mem (\<tau> \<sigma> j' - \<tau> \<sigma> k) (inite (right I)))" using in_interval zero_enat_def by auto
   from A j have B4: "\<And>k. k \<in>{j<..i} \<Longrightarrow>
@@ -371,11 +377,12 @@ next
                                       Formula.sat \<sigma> V v j \<alpha> \<and> 
                                       (\<forall>k\<in>{k..<j}. Formula.sat \<sigma> V v k Formula.TT)) \<and>
                                Formula.sat \<sigma> V v k \<beta>" by auto
-  from A and j show ?L sorry
+  from A and j show ?L
+    by auto
 qed 
 
 
-lemma sat_rewrite_11: "excl_zero I \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.And \<alpha> (Formula.Until \<beta> I \<gamma>)) =
+lemma sat_rewrite_11: "Formula.sat \<sigma> V v i (Formula.And \<alpha> (Formula.Until \<beta> I \<gamma>)) =
                                        Formula.sat \<sigma> V v i (Formula.And \<alpha> (Formula.Until (Formula.And (diamond_b (inite (right I)) \<alpha>) \<beta>) I \<gamma>))" sorry
 
 
