@@ -329,23 +329,57 @@ lemma sat_rewrite_9: "excl_zero I \<Longrightarrow> Formula.sat \<sigma> V v i (
 
 lift_definition inite :: "enat \<Rightarrow> \<I>" is "\<lambda>n. (0, n)" using zero_enat_def by auto
 
+lift_definition init_int :: "\<I> \<Rightarrow> \<I>" is "\<lambda>(_,n). (0, n)" using zero_enat_def by auto
 
-abbreviation one_to where "one_to k \<equiv>  (add k (point 1))"
+lemma left_init_int[simp]: "left (init_int I) = 0"  by (transfer; auto)+
+lemma right_init_int[simp]: "right (init_int I) = right I"  by (transfer; auto)+
 
-(*Insights
-- strictness enforced by excl_zero I. Same I used for Since and diamond: Consequence = diamond is unintentionally strict
-- Using excl_zero I to enforce strictness is more strict than requiring strict inequality between j and i
-- Lemmas are unsound with strict diamond, since diamond occurs in Left running operand that holds when for example j=i-1 but not when j=i 
-- More so, when using excl_zero I, it only holds when j=i-k where k is the length of non-increasing time-stamps between j and i
-- Solved by changing I to (inite (right I)), ie, [0,r]
-*)
+lemma interval_imp: "mem i I \<Longrightarrow> mem i (init_int I)" by simp
 
-lemma past_lookahead: "(Formula.sat \<sigma> V v (k+i) \<alpha> \<and> Formula.sat \<sigma> V v k (diamond_w (init (k+i)) \<alpha>)) = Formula.sat \<sigma> V v i \<alpha>" sorry
-(*lemma future_lookbehind: "k \<ge> i \<Longrightarrow> Formula.sat \<sigma> V v i \<alpha> \<and> Formula.sat \<sigma> V v k (diamond_b (init i) \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" sorry*)
 
-lemma in_interval : "mem i (inite (right I)) = (i \<le> right I)" sorry
+lemma past_lookahead: "(Formula.sat \<sigma> V v (k+i) \<alpha> \<and> Formula.sat \<sigma> V v k (diamond_w (init (\<tau> \<sigma> (k+i) - \<tau> \<sigma> k)) \<alpha>)) = Formula.sat \<sigma> V v (k+i) \<alpha>" 
+  using le_less by fastforce
+
+lemma inite_simps[simp]:
+  "left (inite n) = 0"
+  "right (inite n) = n"
+  by (transfer; auto)+
+
+
+lemma in_interval : "mem i (inite (right I)) = (i \<le> right I)" by simp
 
 lemma in_interval2 : "mem (i+k) (inite (right I)) \<Longrightarrow> mem i (inite (right I))" by (simp add: dual_order.trans in_interval)
+
+
+
+lemma \<tau>_mono2: "j \<le> k \<and> k \<le> j' \<and> j' \<le> i \<Longrightarrow> \<tau> \<sigma> j' - \<tau> \<sigma> k \<le> \<tau> \<sigma> i - \<tau> \<sigma> j"
+    by (force dest: \<tau>_mono[of _ _ \<sigma>])
+
+
+
+lemma to_diamond: "Formula.sat \<sigma> V v (k+i) \<alpha> \<Longrightarrow> Formula.sat \<sigma> V v i (diamond_w (init (\<tau> \<sigma> (k+i) - \<tau> \<sigma> i)) \<alpha>)" sorry
+
+lemma mem_inite: "j \<le> k \<Longrightarrow> mem (\<tau> \<sigma> i - \<tau> \<sigma> j) (inite (right I)) \<Longrightarrow> ((\<tau> \<sigma> i - \<tau> \<sigma> k)  \<le> right I)" 
+proof -
+  assume L: "j \<le> k" "mem (\<tau> \<sigma> i - \<tau> \<sigma> j) (inite (right I))"
+  then have L1:"(\<tau> \<sigma> i - \<tau> \<sigma> j) \<le> right I" by simp
+  from L(1) have L2: "(\<tau> \<sigma> i - \<tau> \<sigma> k) \<le> (\<tau> \<sigma> i - \<tau> \<sigma> j)"  
+    by (simp add: diff_le_mono2)
+  from L1 L2 have L3:"((\<tau> \<sigma> i - \<tau> \<sigma> k)  \<le> right I)" 
+    using dual_order.trans enat_ord_simps(1) by blast
+  then show ?thesis by blast
+qed
+
+lemma mem_init_int: "j\<ge>i \<Longrightarrow> mem j (init_int I) \<Longrightarrow> mem i (init_int I)" by (simp add: dual_order.trans)
+
+lemma mem_of_init_int: "j\<ge>i \<Longrightarrow> mem (\<tau> \<sigma> j - \<tau> \<sigma> i) I \<Longrightarrow>  \<forall>k\<in>{i..j}. mem (\<tau> \<sigma> k - \<tau> \<sigma> i) (init_int I)"
+proof -
+  assume ass:"j\<ge>i" "mem (\<tau> \<sigma> j - \<tau> \<sigma> i) I"
+  from ass(2) have member: "mem (\<tau> \<sigma> j - \<tau> \<sigma> i) (init_int I)" by auto
+  have less: "\<forall>k\<in>{i..j}. (\<tau> \<sigma> k - \<tau> \<sigma> i) \<le> (\<tau> \<sigma> j- \<tau> \<sigma> i)"   by (force dest: \<tau>_mono[of _ _ \<sigma>])
+  from less member show ?thesis using mem_init_int by blast
+qed
+
 
 lemma sat_rewrite_10: "Formula.sat \<sigma> V v i (Formula.And \<alpha> (Formula.Since \<beta> I \<gamma>)) =
                        Formula.sat \<sigma> V v i (Formula.And \<alpha> (Formula.Since (Formula.And (diamond_w (inite (right I)) \<alpha>) \<beta>) I \<gamma>))"
@@ -365,25 +399,27 @@ proof(rule iffI)
                            (\<exists>j'\<ge>k. mem (\<tau> \<sigma> j' - \<tau> \<sigma> k) (inite (right I)))" using in_interval zero_enat_def by auto
   from A j have B4: "\<And>k. k \<in>{j<..i} \<Longrightarrow>
                      (\<exists>j'\<ge>k. Formula.sat \<sigma> V v j' \<alpha>)" by auto
-  from A j B3  have B5: "\<And>k. k \<in>{j<..i} \<Longrightarrow>
+  from A j B3 B4  have B5: "\<And>k. k \<in>{j<..i} \<Longrightarrow>
                              (\<exists>j'\<ge>k. mem (\<tau> \<sigma> j' - \<tau> \<sigma> k) (inite (right I)) \<and> Formula.sat \<sigma> V v j' \<alpha>)" using past_lookahead
-    by (metis B4 add.commute) 
+    by (metis B1 greaterThanAtMost_iff inite_simps(1) inite_simps(2) le0 less_imp_le mem_inite sat.simps(8))
   from A j B5 show ?R by auto
-next
-  assume A:?R 
-  then obtain j where j: "j\<le>i" "mem (\<tau> \<sigma> i - \<tau> \<sigma> j) I" "Formula.sat \<sigma> V v j \<gamma>"
-                         "\<forall>k\<in>{j<..i}.
-                               (\<exists>j\<ge>k. mem (\<tau> \<sigma> j - \<tau> \<sigma> k) (inite (right I)) \<and> 
-                                      Formula.sat \<sigma> V v j \<alpha> \<and> 
-                                      (\<forall>k\<in>{k..<j}. Formula.sat \<sigma> V v k Formula.TT)) \<and>
-                               Formula.sat \<sigma> V v k \<beta>" by auto
-  from A and j show ?L
-    by auto
-qed 
+qed auto
+
+
+
 
 
 lemma sat_rewrite_11: "Formula.sat \<sigma> V v i (Formula.And \<alpha> (Formula.Until \<beta> I \<gamma>)) =
-                                       Formula.sat \<sigma> V v i (Formula.And \<alpha> (Formula.Until (Formula.And (diamond_b (inite (right I)) \<alpha>) \<beta>) I \<gamma>))" sorry
+                                       Formula.sat \<sigma> V v i (Formula.And \<alpha> (Formula.Until (Formula.And (diamond_b (init_int I) \<alpha>) \<beta>) I \<gamma>))" 
+(is "?L = ?R")
+proof(rule iffI)
+  assume L:?L
+  then obtain j where j: "j\<ge>i" "mem (\<tau> \<sigma> j - \<tau> \<sigma> i) I" "Formula.sat \<sigma> V v j \<gamma>" "(\<forall>k\<in>{i..<j}.  Formula.sat \<sigma> V v i \<alpha> \<and> Formula.sat \<sigma> V v k \<beta>)"
+    by auto
+  then have "(\<forall>k\<in>{i..<j}. (\<exists>j\<le>k. mem (\<tau> \<sigma> k - \<tau> \<sigma> j) (init_int I) \<and> Formula.sat \<sigma> V v j \<alpha>) \<and> Formula.sat \<sigma> V v k \<beta>)" 
+    using mem_of_init_int[OF j(1) j(2)] by fastforce
+  then show ?R using L j(1,2,3) by auto
+qed auto
 
 
 
