@@ -348,19 +348,22 @@ proof -
 qed
  
 
-lemma forth_back: "\<tau> \<sigma> i = \<tau> \<sigma> j \<Longrightarrow> Formula.sat \<sigma> V v i \<alpha> \<Longrightarrow> Formula.sat \<sigma> V v j (square_w I (diamond_b I \<alpha>))" sorry
-
-lemma back_forth: "\<tau> \<sigma> (Suc i) = \<tau> \<sigma> (Suc j) \<Longrightarrow> Formula.sat \<sigma> V v (Suc i) \<alpha> \<Longrightarrow> Formula.sat \<sigma> V v (Suc j) (square_b I (diamond_w I \<alpha>))" sorry
-
-lemma sat_rewrite_2: "excl_zero I \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.And \<alpha> (release \<beta> I \<gamma>)) =
-                                      Formula.sat \<sigma> V v i (Formula.And \<alpha> (release (Formula.And \<beta> (diamond_b I \<alpha>)) I (Formula.And \<gamma> (diamond_b I \<alpha>))))" sorry
-
-lemma sat_rewrite_3: "excl_zero I \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.And \<alpha> (trigger \<beta> I \<gamma>)) =
-                                      Formula.sat \<sigma> V v i (Formula.And \<alpha> (trigger (Formula.And \<beta> (diamond_w I \<alpha>)) I (Formula.And \<gamma> (diamond_w I \<alpha>))))" sorry
 
 
-lemma sat_rewrite_8: "excl_zero I \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.Since \<beta> I (Formula.And \<alpha> \<gamma>) ) =
-                                      Formula.sat \<sigma> V v i (Formula.Since (Formula.And (diamond_b I \<alpha>) \<beta>) I (Formula.And \<alpha> \<gamma>))" sorry
+lemma sat_rewrite_8: "Formula.sat \<sigma> V v i (Formula.Since \<beta> I (Formula.And \<alpha> \<gamma>) ) =
+                      Formula.sat \<sigma> V v i (Formula.Since (Formula.And (diamond_b (init_int I) \<alpha>) \<beta>) I (Formula.And \<alpha> \<gamma>))"
+(is "?L = ?R")
+proof(rule iffI)
+  assume L:?L
+  then obtain j where j:"j\<le>i" "mem (\<tau> \<sigma> i - \<tau> \<sigma> j) I" "Formula.sat \<sigma> V v j \<alpha>" "Formula.sat \<sigma> V v j \<gamma>" "(\<forall>k\<in>{j<..i}. Formula.sat \<sigma> V v k \<beta>)" by auto
+
+  have "\<forall>k\<in>{j<..i}. j\<le>k" by simp
+  moreover have "\<forall>k\<in>{j<..i}. mem (\<tau> \<sigma> k - \<tau> \<sigma> j) (init_int I)" using nat_less_mem_of_init[OF _ j(2)] by auto
+  moreover have "\<forall>k\<in>{j<..i}. Formula.sat \<sigma> V v j \<alpha>" using j(3) by auto
+  ultimately have "\<forall>k\<in>{j<..i}. \<exists>j\<le>k. mem (\<tau> \<sigma> k - \<tau> \<sigma> j) (init_int I) \<and> Formula.sat \<sigma> V v j \<alpha>" by fast
+
+  then show ?R using L j by auto
+qed auto
 
 lemma sat_rewrite_9: "Formula.sat \<sigma> V v i (Formula.Until \<beta> I (Formula.And \<alpha> \<gamma>)) =
                                       Formula.sat \<sigma> V v i (Formula.Until (Formula.And (diamond_w (init_int I) \<alpha>) \<beta>) I (Formula.And \<alpha> \<gamma>))" 
@@ -368,18 +371,13 @@ lemma sat_rewrite_9: "Formula.sat \<sigma> V v i (Formula.Until \<beta> I (Formu
 proof(rule iffI)
   assume L:?L
   then obtain j where j: "j\<ge>i" "mem (\<tau> \<sigma> j - \<tau> \<sigma> i) I" "Formula.sat \<sigma> V v j \<alpha>"  "Formula.sat \<sigma> V v j \<gamma>" "(\<forall>k\<in>{i..<j}. Formula.sat \<sigma> V v k \<beta>)" by auto
-  then have "\<forall>k\<in>{i..<j}. j \<ge> k \<and> mem (\<tau> \<sigma> j - \<tau> \<sigma> k) (init_int I) \<and> Formula.sat \<sigma> V v j \<alpha>" using nat_less_mem_of_init[OF _ j(2)] by fastforce
-  then  show ?R using L sorry
-qed auto
 
-lemma sat_rewrite_10: "Formula.sat \<sigma> V v i (Formula.And \<alpha> (Formula.Since \<beta> I \<gamma>)) =
-                       Formula.sat \<sigma> V v i (Formula.And \<alpha> (Formula.Since (Formula.And (diamond_w (init_int I) \<alpha>) \<beta>) I \<gamma>))"
-(is "?L = ?R")
-proof(rule iffI)
-  assume L:?L
-  then obtain j where j: "j\<le>i" "mem (\<tau> \<sigma> i - \<tau> \<sigma> j) I" "Formula.sat \<sigma> V v j \<gamma>" "(\<forall>k\<in>{j<..i}. Formula.sat \<sigma> V v i \<alpha> \<and> Formula.sat \<sigma> V v k \<beta>)" by auto
-  then have "\<forall>k\<in>{j<..i}. mem (\<tau> \<sigma> i - \<tau> \<sigma> k) (init_int I)" using nat_less_mem_of_init[OF _ j(2)] by fastforce
-  then show ?R using L j by fastforce
+  have "\<forall>k\<in>{i..<j}. j\<ge>k" by auto
+  moreover have "\<forall>k\<in>{i..<j}. mem (\<tau> \<sigma> j - \<tau> \<sigma> k) (init_int I)" using nat_less_mem_of_init[OF _ j(2)] by auto
+  moreover have "\<forall>k\<in>{i..<j}. Formula.sat \<sigma> V v j \<alpha>" using j(3) by auto
+  ultimately have "\<forall>k\<in>{i..<j}. \<exists>j\<ge>k. mem (\<tau> \<sigma> j - \<tau> \<sigma> k) (init_int I) \<and> Formula.sat \<sigma> V v j \<alpha>" by fast
+
+  then show ?R using L j by auto
 qed auto
 
 lemma sat_rewrite_11: "Formula.sat \<sigma> V v i (Formula.And \<alpha> (Formula.Until \<beta> I \<gamma>)) =
@@ -391,6 +389,25 @@ proof(rule iffI)
   then have "\<forall>k\<in>{i..<j}. mem (\<tau> \<sigma> k - \<tau> \<sigma> i) (init_int I)" using nat_less_mem_of_init[OF _ j(2)] by fastforce
   then show ?R using L j by fastforce
 qed auto
+
+
+lemma sat_rewrite_10: "Formula.sat \<sigma> V v i (Formula.And \<alpha> (Formula.Since \<beta> I \<gamma>)) =
+                       Formula.sat \<sigma> V v i (Formula.And \<alpha> (Formula.Since (Formula.And (diamond_w (init_int I) \<alpha>) \<beta>) I \<gamma>))"
+(is "?L = ?R")
+proof(rule iffI)
+  assume L:?L
+  then obtain j where j: "j\<le>i" "mem (\<tau> \<sigma> i - \<tau> \<sigma> j) I" "Formula.sat \<sigma> V v j \<gamma>" "(\<forall>k\<in>{j<..i}. Formula.sat \<sigma> V v i \<alpha> \<and> Formula.sat \<sigma> V v k \<beta>)" by auto
+  then have "\<forall>k\<in>{j<..i}. mem (\<tau> \<sigma> i - \<tau> \<sigma> k) (init_int I)" using nat_less_mem_of_init[OF _ j(2)] by fastforce
+  then show ?R using L j by fastforce
+qed auto
+
+lemma sat_rewrite_2: "Formula.sat \<sigma> V v i (Formula.And \<alpha> (release \<beta> I \<gamma>)) =
+                                      Formula.sat \<sigma> V v i (Formula.And \<alpha> (release (Formula.And \<beta> (diamond_b (init_int I) \<alpha>)) I (Formula.And \<gamma> (diamond_b I \<alpha>))))" sorry
+
+lemma sat_rewrite_3: "excl_zero I \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.And \<alpha> (trigger \<beta> I \<gamma>)) =
+                                      Formula.sat \<sigma> V v i (Formula.And \<alpha> (trigger (Formula.And \<beta> (diamond_w I \<alpha>)) I (Formula.And \<gamma> (diamond_w I \<alpha>))))" sorry
+
+
 
 
 (*lemma \<tau>_mono2: "j \<le> k \<and> k \<le> j' \<and> j' \<le> i \<Longrightarrow> \<tau> \<sigma> j' - \<tau> \<sigma> k \<le> \<tau> \<sigma> i - \<tau> \<sigma> j"
