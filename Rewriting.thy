@@ -215,6 +215,21 @@ lemma sat_3_f4: "Formula.sat \<sigma> V v i (Formula.Neg (square_b I \<alpha>)) 
 abbreviation release where "release \<beta> I \<gamma> \<equiv> Formula.Neg (Formula.Until (Formula.Neg \<beta>) I (Formula.Neg \<gamma>) )"
 abbreviation trigger where "trigger \<beta> I \<gamma> \<equiv> Formula.Neg (Formula.Since (Formula.Neg \<beta>) I (Formula.Neg \<gamma>) )"
 
+abbreviation release2 where "release2 \<beta> I \<gamma> \<equiv> Formula.And (Formula.Neg (Formula.Until (Formula.Neg \<beta>) I (Formula.Neg \<gamma>) ))
+                                                          (diamond_w I Formula.TT)"
+
+(*lemma strict_since: "excl_zero I \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.Since \<phi> I \<psi>) = 
+                                    (\<exists>j<i. mem (\<tau> \<sigma> i - \<tau> \<sigma> j) I \<and> Formula.sat \<sigma> V v j \<psi> \<and> (\<forall>k \<in> {j <.. i}. Formula.sat \<sigma> V v k \<phi>))" sorry
+
+lemma strict_until: "excl_zero I \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.Until \<phi> I \<psi>) = 
+                                    (\<exists>j>i. mem (\<tau> \<sigma> j - \<tau> \<sigma> i) I \<and> Formula.sat \<sigma> V v j \<psi> \<and> (\<forall>k \<in> {i..< j}. Formula.sat \<sigma> V v k \<phi>))"  using le_eq_less_or_eq by auto*)
+
+(*lemma excl_zero_strict: "excl_zero I \<Longrightarrow> mem (\<tau> \<sigma> j - \<tau> \<sigma> i) I \<Longrightarrow> j>i" by fastforce*)
+
+
+lemma sat_release2: "excl_zero I \<Longrightarrow> Formula.sat \<sigma> V v i (release2 \<beta> I \<gamma>) \<Longrightarrow>
+                     (\<exists>j>i. mem (\<tau> \<sigma> j - \<tau> \<sigma> i) I \<and> ( Formula.sat \<sigma> V v j \<gamma> \<or> (\<exists>k\<in>{i..<j}. Formula.sat \<sigma> V v k \<beta>)))" by fastforce
+
 lemma sat_3_g1: "excl_zero I \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.Neg (Formula.Since \<beta> I \<gamma>)) = 
                                  Formula.sat \<sigma> V v i (trigger (Formula.Neg \<beta>) I (Formula.Neg \<gamma>))" by simp
 
@@ -303,11 +318,6 @@ lemma sat_rewrite_22: "Formula.sat \<sigma> V v i (Formula.And \<alpha> (Formula
 
 lemma sat_rewrite_23: "Formula.sat \<sigma> V v i (Formula.And \<alpha> (Formula.Next I \<beta>)) = 
                                        Formula.sat \<sigma> V v i (Formula.And \<alpha> (Formula.Next I (Formula.And (Formula.Prev I \<alpha>) \<beta>)))" by auto
-
-(*non-trivial*)
-
-(*abbreviation past_window where "past_window I \<alpha> \<equiv> Formula.Since \<alpha> I Formula.TT"
-abbreviation future_window where "future_window I \<alpha> \<equiv> Formula.Until \<alpha> I Formula.TT"*)
 
 
 lift_definition init_int :: "\<I> \<Rightarrow> \<I>" is "\<lambda>(_,n). (0, n)" using zero_enat_def by auto
@@ -401,17 +411,82 @@ proof(rule iffI)
   then show ?R using L j by fastforce
 qed auto
 
-lemma sat_rewrite_2: "Formula.sat \<sigma> V v i (Formula.And \<alpha> (release \<beta> I \<gamma>)) =
-                                      Formula.sat \<sigma> V v i (Formula.And \<alpha> (release (Formula.And \<beta> (diamond_b (init_int I) \<alpha>)) I (Formula.And \<gamma> (diamond_b I \<alpha>))))" sorry
+(*
+lemma future_lookbehind: "excl_zero I \<Longrightarrow> mem (\<tau> \<sigma> j - \<tau> \<sigma> i) I \<Longrightarrow> Formula.sat \<sigma> V v i \<alpha> \<Longrightarrow> \<forall>k\<in>{i..j}. Formula.sat \<sigma> V v k (diamond_b (init_int I) \<alpha>)"
+(is "?A1 \<Longrightarrow> ?A2 \<Longrightarrow> ?A3 \<Longrightarrow> ?R ")
+proof-
+  assume ass: ?A1 ?A2 ?A3
+  then have "\<forall>k\<in>{i..j}. mem (\<tau> \<sigma> k - \<tau> \<sigma> i) (init_int I)" using nat_less_mem_of_init[OF _ ass(2)] by simp
+  then show ?R using ass(3) by auto
+qed*)
+
+lemma sat_rewrite_2: "excl_zero I \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.And \<alpha> (release \<beta> I \<gamma>)) =
+                                      Formula.sat \<sigma> V v i (Formula.And \<alpha> (release (Formula.And \<beta> (diamond_b (init_int I) \<alpha>)) I (Formula.And \<gamma> (diamond_b I \<alpha>))))" 
+(is "?A \<Longrightarrow> ?L = ?R" )
+proof(rule iffI)
+  assume ass: "?A" "?L"
+  then have split_A: "Formula.sat \<sigma> V v i \<alpha>" 
+                   "(\<And>j. j\<ge>i \<Longrightarrow> \<not> mem (\<tau> \<sigma> j - \<tau> \<sigma> i) I \<or> Formula.sat \<sigma> V v j \<gamma> \<or> (\<exists>k\<in>{i..<j}. Formula.sat \<sigma> V v k \<beta>))"
+    by auto
+
+  then have "(\<And>j. j\<ge>i \<Longrightarrow> \<not> mem (\<tau> \<sigma> j - \<tau> \<sigma> i) I \<or>
+               (Formula.sat \<sigma> V v j \<gamma> \<and> (\<exists>ja\<le>j. mem (\<tau> \<sigma> j - \<tau> \<sigma> ja) I)) \<or>
+              (\<exists>k\<in>{i..<j}.
+                  (Formula.sat \<sigma> V v k \<beta> \<and> (\<exists>j\<le>k. mem (\<tau> \<sigma> k - \<tau> \<sigma> j) (init_int I) \<and> Formula.sat \<sigma> V v j \<alpha> ))))" 
+  proof -
+  fix j assume le:"j\<ge>i" 
+  then have " \<not> mem (\<tau> \<sigma> j - \<tau> \<sigma> i) I \<or> Formula.sat \<sigma> V v j \<gamma> \<or> (\<exists>k\<in>{i..<j}. Formula.sat \<sigma> V v k \<beta>)" using ass(2) by auto
+  then consider (a) "\<not> mem (\<tau> \<sigma> j - \<tau> \<sigma> i) I" | 
+                (b) "(Formula.sat \<sigma> V v j \<gamma>) \<and>  mem (\<tau> \<sigma> j - \<tau> \<sigma> i) I" | 
+                (c) "(\<exists>k\<in>{i..<j}. Formula.sat \<sigma> V v k \<beta>)"  "mem (\<tau> \<sigma> j - \<tau> \<sigma> i) I" by auto
+  then show "(\<not> mem (\<tau> \<sigma> j - \<tau> \<sigma> i) I \<or>
+               (Formula.sat \<sigma> V v j \<gamma> \<and> (\<exists>ja\<le>j. mem (\<tau> \<sigma> j - \<tau> \<sigma> ja) I)) \<or>
+              (\<exists>k\<in>{i..<j}.
+                  (Formula.sat \<sigma> V v k \<beta> \<and> (\<exists>j\<le>k. mem (\<tau> \<sigma> k - \<tau> \<sigma> j) (init_int I) \<and> Formula.sat \<sigma> V v j \<alpha> ))))" 
+  proof(cases)
+    case a
+    then show ?thesis by auto
+  next
+    case b
+    then show ?thesis using le by auto
+  next
+    case c
+    then show ?thesis using split_A(1) nat_less_mem_of_init[OF _ c(2)] by auto
+  qed
+qed
+  then show ?R using split_A(1)  by auto
+qed auto
 
 lemma sat_rewrite_3: "excl_zero I \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.And \<alpha> (trigger \<beta> I \<gamma>)) =
-                                      Formula.sat \<sigma> V v i (Formula.And \<alpha> (trigger (Formula.And \<beta> (diamond_w I \<alpha>)) I (Formula.And \<gamma> (diamond_w I \<alpha>))))" sorry
-
-
-
-
-(*lemma \<tau>_mono2: "j \<le> k \<and> k \<le> j' \<and> j' \<le> i \<Longrightarrow> \<tau> \<sigma> j' - \<tau> \<sigma> k \<le> \<tau> \<sigma> i - \<tau> \<sigma> j"
-    by (force dest: \<tau>_mono[of _ _ \<sigma>])*)
-
-
+                                      Formula.sat \<sigma> V v i (Formula.And \<alpha> (trigger (Formula.And \<beta> (diamond_w (init_int I) \<alpha>)) I (Formula.And \<gamma> (diamond_w I \<alpha>))))" 
+(is "?A \<Longrightarrow> ?L = ?R" )
+proof(rule iffI)
+  assume ass: "?A" "?L"
+  then have split_A: "Formula.sat \<sigma> V v i \<alpha>" 
+                     "(\<And>j. i\<ge>j \<Longrightarrow> \<not> mem (\<tau> \<sigma> i - \<tau> \<sigma> j) I \<or> Formula.sat \<sigma> V v j \<gamma> \<or> (\<exists>k\<in>{j<..i}. Formula.sat \<sigma> V v k \<beta>))" by auto
+  then have "(\<And>j. i\<ge>j \<Longrightarrow> \<not>mem (\<tau> \<sigma> i - \<tau> \<sigma> j) I \<or>
+              (Formula.sat \<sigma> V v j \<gamma> \<and> (\<exists>ja\<ge>j. mem (\<tau> \<sigma> ja - \<tau> \<sigma> j) I)) \<or>
+              (\<exists>k\<in>{j<..i}. (Formula.sat \<sigma> V v k \<beta> \<and> (\<exists>j\<ge>k. mem (\<tau> \<sigma> j - \<tau> \<sigma> k) (init_int I) \<and> Formula.sat \<sigma> V v j \<alpha>))))" 
+  proof -
+    fix j assume le:"i\<ge>j" 
+    then have " \<not> mem (\<tau> \<sigma> i - \<tau> \<sigma> j) I \<or> Formula.sat \<sigma> V v j \<gamma> \<or> (\<exists>k\<in>{j<..i}. Formula.sat \<sigma> V v k \<beta>)" using ass(2) by auto
+    then consider (a) "\<not> mem (\<tau> \<sigma> i - \<tau> \<sigma> j) I " |
+                  (b) "Formula.sat \<sigma> V v j \<gamma> \<and> mem (\<tau> \<sigma> i - \<tau> \<sigma> j) I" | 
+                  (c) "(\<exists>k\<in>{j<..i}. Formula.sat \<sigma> V v k \<beta>)" "mem (\<tau> \<sigma> i - \<tau> \<sigma> j) I" by auto
+    then show "\<not>mem (\<tau> \<sigma> i - \<tau> \<sigma> j) I \<or>
+              (Formula.sat \<sigma> V v j \<gamma> \<and> (\<exists>ja\<ge>j. mem (\<tau> \<sigma> ja - \<tau> \<sigma> j) I)) \<or>
+              (\<exists>k\<in>{j<..i}. (Formula.sat \<sigma> V v k \<beta> \<and> (\<exists>j\<ge>k. mem (\<tau> \<sigma> j - \<tau> \<sigma> k) (init_int I) \<and> Formula.sat \<sigma> V v j \<alpha>)))" 
+  proof(cases)
+    case a
+    then show ?thesis by blast
+  next
+    case b
+    then show ?thesis using le by auto
+  next
+    case c
+    then show ?thesis using split_A(1) nat_less_mem_of_init[OF _ c(2)] by auto
+  qed
+qed
+then show ?R using split_A(1) by auto
+qed auto
 end
