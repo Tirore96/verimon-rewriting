@@ -561,7 +561,6 @@ fun rewrite2:: "Formula.formula \<Rightarrow> Formula.formula" where
 
 thm conj_cong
 thm sat.simps(15)
-(*declare [[simp_trace]]*)
 lemma rewrite2_sat: "Formula.sat \<sigma> V v i (rewrite2 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
 proof(induction \<alpha> arbitrary: i rule:rewrite2.induct)
   case (1 \<alpha> \<beta> I \<gamma>)
@@ -583,21 +582,26 @@ proof(induction \<alpha> arbitrary: i rule:rewrite3.induct)
   then show ?case by (simp only:rewrite3.simps Let_def sat_rewrite_3[symmetric] split:if_splits;simp)
 qed auto
 
-fun rewrite4 :: "Formula.formula \<Rightarrow> Formula.formula" where
+(*fun rewrite4 :: "Formula.formula \<Rightarrow> Formula.formula" where
  "rewrite4 (Formula.And \<alpha> (Formula.Exists \<beta>)) =(let \<alpha>' = rewrite4 \<alpha>;
                                                     \<beta>' = rewrite4 \<beta>
                                                 in if prop_cond \<alpha>' \<beta>'  
                                                  then Formula.Exists (Formula.And (shift \<alpha>') \<beta>')  
                                                  else Formula.And \<alpha>' (Formula.Exists \<beta>'))"
+| "rewrite4 f = f"*)
+
+fun rewrite4 :: "Formula.formula \<Rightarrow> Formula.formula" where
+ "rewrite4 (Formula.And \<alpha> (Formula.Exists \<beta>)) =(let \<alpha>' = rewrite4 \<alpha>;
+                                                    \<beta>' = rewrite4 \<beta>
+                                                in
+                                                 Formula.Exists (Formula.And (shift \<alpha>') \<beta>'))"
 | "rewrite4 f = f"
 
+thm sat.simps(10)
 lemma rewrite4_sat: "Formula.sat \<sigma> V v i (rewrite4 f) = Formula.sat \<sigma> V v i f" 
 proof(induction f arbitrary: i v rule:rewrite4.induct)
-  case (1 \<alpha> \<beta>)
-  then show ?case
-    thm sat_rewrite_4[symmetric,of _ _ _ _ \<alpha> \<beta>]
-    apply(simp only: rewrite4.simps sat_rewrite_4[symmetric,of _ _ _ _ \<alpha> \<beta>] Let_def split:if_splits;simp)
-    sorry
+  case (1 \<alpha> \<beta>)  
+  then show ?case by(simp only: rewrite4.simps shiftI.simps sat_rewrite_4[symmetric] Let_def split:if_splits;simp) 
 qed auto
 
 fun rewrite5 :: "Formula.formula \<Rightarrow> Formula.formula" where
@@ -608,28 +612,57 @@ fun rewrite5 :: "Formula.formula \<Rightarrow> Formula.formula" where
                                                  else Formula.And \<alpha>' (Formula.Neg \<beta>'))"
 | "rewrite5 f = f"
 
+
 lemma rewrite5_sat: "Formula.sat \<sigma> V v i (rewrite5 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
 proof(induction \<alpha> rule:rewrite5.induct)
   case (1 \<alpha> \<beta>)
   then show ?case by (simp add: Let_def sat_rewrite_5;auto)
+qed auto
 
 fun rewrite6 :: "Formula.formula \<Rightarrow> Formula.formula" where
   "rewrite6 (Formula.Since (Formula.And \<alpha> \<gamma>) I \<beta> ) =(let \<alpha>' = rewrite6 \<alpha>;
                                                         \<beta>' = rewrite6 \<beta>;
                                                         \<gamma>' = rewrite6 \<gamma>
                                                 in if prop_cond \<alpha>' \<beta>' \<and> excl_zero I 
-                                                 then Formula.And \<alpha>' (Formula.Since (Formula.And \<alpha>' \<gamma>') I (Formula.And (diamond_w I \<alpha>') \<beta>'))  
+                                                 then Formula.Since (Formula.And \<alpha>' \<gamma>') I (Formula.And (diamond_w I \<alpha>') \<beta>')  
                                                  else Formula.Since (Formula.And \<alpha>' \<gamma>') I \<beta>' )"
 | "rewrite6 f = f"
+
+lemma rewrite6_sat: "Formula.sat \<sigma> V v i (rewrite6 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
+proof(induction \<alpha> arbitrary: i rule:rewrite6.induct)
+  case (1 \<alpha> \<gamma> I \<beta>)
+  then show ?case  
+  proof(cases "excl_zero I")
+    thm sat_rewrite_6[symmetric]
+    case True
+    then show ?thesis using 1 by (simp only:rewrite6.simps Let_def sat_rewrite_6[OF True,symmetric] split:if_splits;simp)
+  next
+    case False
+    then show ?thesis using 1 by simp
+  qed
+qed auto
 
 fun rewrite7 :: "Formula.formula \<Rightarrow> Formula.formula" where
   "rewrite7 (Formula.Until (Formula.And \<alpha> \<gamma>) I \<beta> ) =(let \<alpha>' = rewrite7 \<alpha>;
                                                         \<beta>' = rewrite7 \<beta>;
                                                         \<gamma>' = rewrite7 \<gamma>
                                                 in if prop_cond \<alpha>' \<beta>' \<and> excl_zero I 
-                                                 then Formula.And \<alpha>' (Formula.Until (Formula.And \<alpha>' \<gamma>') I (Formula.And (diamond_b I \<alpha>') \<beta>'))  
-                                                 else Formula.Since (Formula.And \<alpha>' \<gamma>') I \<beta>' )"
+                                                 then Formula.Until (Formula.And \<alpha>' \<gamma>') I (Formula.And (diamond_b I \<alpha>') \<beta>')
+                                                 else Formula.Until (Formula.And \<alpha>' \<gamma>') I \<beta>')"
 | "rewrite7 f = f"
+
+lemma rewrite7_sat: "Formula.sat \<sigma> V v i (rewrite7 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
+proof(induction \<alpha> arbitrary: i rule:rewrite7.induct)
+  case (1 \<alpha> \<gamma> I \<beta>)
+  then show ?case
+  proof(cases "excl_zero I")
+    case True
+    then show ?thesis using 1 by (simp only:rewrite7.simps Let_def sat_rewrite_7[OF True,symmetric] split:if_splits;simp)
+  next
+    case False
+    then show ?thesis using 1 by simp
+  qed
+qed auto
 
 fun rewrite8 :: "Formula.formula \<Rightarrow> Formula.formula" where
   "rewrite8 (Formula.Since \<beta> I (Formula.And \<alpha> \<gamma>)) =(let \<alpha>' = rewrite8 \<alpha>;
@@ -641,6 +674,12 @@ fun rewrite8 :: "Formula.formula \<Rightarrow> Formula.formula" where
 
 | "rewrite8 f = f"
 
+lemma rewrite8_sat: "Formula.sat \<sigma> V v i (rewrite8 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
+proof(induction \<alpha> arbitrary: i rule:rewrite8.induct)
+  case (1 \<beta> I \<alpha> \<gamma>)
+  then show ?case by (simp only:rewrite8.simps Let_def sat_rewrite_8[symmetric] split:if_splits;simp)
+qed auto
+
 fun rewrite9 :: "Formula.formula \<Rightarrow> Formula.formula" where
   "rewrite9 (Formula.Until \<beta> I (Formula.And \<alpha> \<gamma>)) =(let \<alpha>' = rewrite9 \<alpha>;
                                                         \<beta>' = rewrite9 \<beta>;
@@ -650,6 +689,13 @@ fun rewrite9 :: "Formula.formula \<Rightarrow> Formula.formula" where
                                                  else Formula.Until \<beta>' I (Formula.And \<alpha>' \<gamma>') )"
 
 | "rewrite9 f = f"
+
+lemma rewrite9_sat: "Formula.sat \<sigma> V v i (rewrite9 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
+proof(induction \<alpha> arbitrary: i rule:rewrite9.induct)
+  case (1 \<beta>I \<alpha> \<gamma>)
+  then show ?case by (simp only:rewrite9.simps Let_def sat_rewrite_9[symmetric] split:if_splits;simp)
+qed auto
+
 
 fun rewrite10 :: "Formula.formula \<Rightarrow> Formula.formula" where
   "rewrite10 (Formula.And \<alpha> (Formula.Since \<beta> I \<gamma>)) =(let \<alpha>' = rewrite10 \<alpha>;
@@ -661,6 +707,12 @@ fun rewrite10 :: "Formula.formula \<Rightarrow> Formula.formula" where
 
 | "rewrite10 f = f"
 
+lemma rewrite10_sat: "Formula.sat \<sigma> V v i (rewrite10 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
+proof(induction \<alpha> arbitrary: i rule:rewrite10.induct)
+  case (1 \<alpha> \<beta> I \<gamma>)
+  then show ?case by (simp only:rewrite10.simps Let_def sat_rewrite_10[symmetric] split:if_splits;simp)
+qed auto
+
 fun rewrite11 :: "Formula.formula \<Rightarrow> Formula.formula" where
   "rewrite11 (Formula.And \<alpha> (Formula.Until \<beta> I \<gamma>)) =(let \<alpha>' = rewrite11 \<alpha>;
                                                         \<beta>' = rewrite11 \<beta>;
@@ -670,6 +722,12 @@ fun rewrite11 :: "Formula.formula \<Rightarrow> Formula.formula" where
                                                  else Formula.And \<alpha>' (Formula.Until \<beta>' I \<gamma>'))"
 
 | "rewrite11 f = f"
+
+lemma rewrite11_sat: "Formula.sat \<sigma> V v i (rewrite11 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
+proof(induction \<alpha> arbitrary: i rule:rewrite11.induct)
+  case (1 \<beta>I \<alpha> \<gamma>)
+  then show ?case by (simp only:rewrite11.simps Let_def sat_rewrite_11[symmetric] split:if_splits;simp)
+qed auto
 
 fun rewrite12 :: "Formula.formula \<Rightarrow> Formula.formula" where
   "rewrite12 (Formula.And \<alpha> (Formula.Since \<gamma> I \<beta>)) =(let \<alpha>' = rewrite12 \<alpha>;
@@ -681,6 +739,12 @@ fun rewrite12 :: "Formula.formula \<Rightarrow> Formula.formula" where
 
 | "rewrite12 f = f"
 
+lemma rewrite12_sat: "Formula.sat \<sigma> V v i (rewrite12 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
+proof(induction \<alpha> arbitrary: i rule:rewrite12.induct)
+  case (1)
+  then show ?case by (simp only:rewrite12.simps Let_def sat_rewrite_12[symmetric] split:if_splits;simp)
+qed auto
+
 fun rewrite13 :: "Formula.formula \<Rightarrow> Formula.formula" where
   "rewrite13 (Formula.And \<alpha> (Formula.Until \<gamma> I \<beta>)) =(let \<alpha>' = rewrite13 \<alpha>;
                                                         \<beta>' = rewrite13 \<beta>;
@@ -690,6 +754,12 @@ fun rewrite13 :: "Formula.formula \<Rightarrow> Formula.formula" where
                                                  else Formula.And \<alpha>' (Formula.Until \<gamma>' I \<beta>'))"
 
 | "rewrite13 f = f"
+
+lemma rewrite13_sat: "Formula.sat \<sigma> V v i (rewrite13 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
+proof(induction \<alpha> arbitrary: i rule:rewrite13.induct)
+  case (1)
+  then show ?case by (simp only:rewrite13.simps Let_def sat_rewrite_13[symmetric] split:if_splits;simp)
+qed auto
 
 (*Introduced abbreviations of TT and FF to allow diamond_b abbreviation in pattern*)
 function(sequential) rewrite18 :: "Formula.formula \<Rightarrow> Formula.formula" where
@@ -703,6 +773,12 @@ function(sequential) rewrite18 :: "Formula.formula \<Rightarrow> Formula.formula
   sorry
 termination by lexicographic_order
 
+lemma rewrite18_sat: "Formula.sat \<sigma> V v i (rewrite18 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
+proof(induction \<alpha> arbitrary: i rule:rewrite18.induct)
+  case (1)
+  then show ?case by (simp only:rewrite18.simps Let_def sat_rewrite_18[symmetric] split:if_splits;simp)
+qed auto
+
 function(sequential) rewrite19 :: "Formula.formula \<Rightarrow> Formula.formula" where
   "rewrite19 (Formula.And \<alpha> (diamond_w I \<beta>)) =(let \<alpha>' = rewrite19 \<alpha>;
                                                    \<beta>' = rewrite19 \<beta>
@@ -711,8 +787,14 @@ function(sequential) rewrite19 :: "Formula.formula \<Rightarrow> Formula.formula
                                                  else Formula.And \<alpha>' (diamond_w I \<beta>'))"
 
 | "rewrite19 f = f"
- sorry
+  sorry
 termination by lexicographic_order
+
+lemma rewrite19_sat: "Formula.sat \<sigma> V v i (rewrite19 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
+proof(induction \<alpha> arbitrary: i rule:rewrite19.induct)
+  case (1)
+  then show ?case by (simp only:rewrite19.simps Let_def sat_rewrite_19[symmetric] split:if_splits;simp)
+qed auto
 
 function(sequential) rewrite20 :: "Formula.formula \<Rightarrow> Formula.formula" where
   "rewrite20 (Formula.And \<alpha> (square_b I \<beta>)) =(let \<alpha>' = rewrite20 \<alpha>;
@@ -725,6 +807,13 @@ function(sequential) rewrite20 :: "Formula.formula \<Rightarrow> Formula.formula
  sorry
 termination by lexicographic_order
 
+lemma rewrite20_sat: "Formula.sat \<sigma> V v i (rewrite20 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
+proof(induction \<alpha> arbitrary: i rule:rewrite20.induct)
+  case (1)
+  then show ?case by (simp only:rewrite20.simps Let_def sat_rewrite_20[symmetric] split:if_splits;simp)
+qed auto
+
+
 function(sequential) rewrite21 :: "Formula.formula \<Rightarrow> Formula.formula" where
   "rewrite21 (Formula.And \<alpha> (square_w I \<beta>)) =(let \<alpha>' = rewrite21 \<alpha>;
                                                    \<beta>' = rewrite21 \<beta>
@@ -736,16 +825,29 @@ function(sequential) rewrite21 :: "Formula.formula \<Rightarrow> Formula.formula
  sorry
 termination by lexicographic_order
 
+lemma rewrite21_sat: "Formula.sat \<sigma> V v i (rewrite21 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
+proof(induction \<alpha> arbitrary: i rule:rewrite21.induct)
+  case (1)
+  then show ?case by (simp only:rewrite21.simps Let_def sat_rewrite_21[symmetric] split:if_splits;simp)
+qed auto
+
+
 function(sequential) rewrite22 :: "Formula.formula \<Rightarrow> Formula.formula" where
   "rewrite22 (Formula.And \<alpha> (Formula.Prev I \<beta>)) =(let \<alpha>' = rewrite22 \<alpha>;
-                                                   \<beta>' = rewrite22 \<beta>
+                                                      \<beta>' = rewrite22 \<beta>
                                                 in if prop_cond \<alpha>' \<beta>'
-                                                 then Formula.And \<alpha>' (Formula.Prev I (Formula.And (Formula.Next I \<alpha>') \<beta>')))
+                                                 then Formula.And \<alpha>' (Formula.Prev I (Formula.And (Formula.Next I \<alpha>') \<beta>'))
                                                  else Formula.And \<alpha>' (Formula.Prev I \<beta>'))"
 
 | "rewrite22 f = f"
  sorry
 termination by lexicographic_order
+
+lemma rewrite22_sat: "Formula.sat \<sigma> V v i (rewrite22 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
+proof(induction \<alpha> arbitrary: i rule:rewrite22.induct)
+  case (1)
+  then show ?case by (simp only:rewrite22.simps Let_def sat_rewrite_22[symmetric] split:if_splits ;simp split:nat.splits)
+qed auto
 
 function(sequential) rewrite23 :: "Formula.formula \<Rightarrow> Formula.formula" where
   "rewrite23 (Formula.And \<alpha> (Formula.Next I \<beta>)) =(let \<alpha>' = rewrite23 \<alpha>;
@@ -758,63 +860,11 @@ function(sequential) rewrite23 :: "Formula.formula \<Rightarrow> Formula.formula
  sorry
 termination by lexicographic_order
 
-(*lemma rewrite_sat: "Formula.sat \<sigma> V v i \<alpha> = Formula.sat \<sigma> V v i (rewrite \<alpha>)" 
-proof(induction \<alpha> rule:rewrite.induct)
-  case (1 \<alpha> \<beta> \<gamma>)
-  then show ?case using sat_rewrite_1 by (simp add: Let_def)
-next
-  case (2 \<alpha> \<beta> I \<gamma>)
-  then show ?case using sat_rewrite_2 sorry
-next
-  case (3 \<alpha> \<beta> I \<gamma>)
-  then show ?case using sat_rewrite_3 sorry
-next
-  case (4 \<alpha> \<beta>)
-  then show ?case using sat_rewrite_4 sorry
-next
-  case ("5_1" \<alpha> \<beta>)
-  then show ?case using sat_rewrite_5 sorry
-next
-  case (6 \<alpha> \<gamma> I \<beta>)
-  then show ?case using sat_rewrite_6 sorry
-next
-  case (7 \<alpha> \<gamma> I \<beta>)
-  then show ?case using sat_rewrite_7 sorry
-next
-  case (8 \<beta> I \<alpha> \<gamma>)
-  then show ?case using sat_rewrite_7 sorry
+lemma rewrite23_sat: "Formula.sat \<sigma> V v i (rewrite23 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
+proof(induction \<alpha> arbitrary: i rule:rewrite23.induct)
+  case (1)
+  then show ?case by (simp only:rewrite23.simps Let_def sat_rewrite_23[symmetric] split:if_splits;simp)
 qed auto
-
-
-
-case (1 a b g)
-  then show ?case using sat_rewrite_1 by (simp add: Let_def)
-case (2 a b I g)
-  then show ?case using sat_rewrite_2 sorry (*by (simp del: sat.simps  add: Let_def split: if_splits)*)
-case (3 a b I g)
-  then show ?case using sat_rewrite_3 sorry
-case (4 \<alpha> \<beta>)
-  then show ?case using sat_rewrite_4 by (simp add: Let_def)
-case (5 a b)
-  then show ?case using sat_rewrite_5 by (simp add: Let_def)
-qed auto            *)                     
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
