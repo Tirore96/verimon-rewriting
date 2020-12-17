@@ -857,7 +857,6 @@ qed auto
 *)
 
 
-
 function(sequential) rewrite :: "Formula.formula \<Rightarrow> Formula.formula" where
 (*1*)  "rewrite (Formula.And \<alpha> (Formula.Or \<beta> \<gamma>)) = (let \<alpha>' = rewrite \<alpha>;
                                                     \<beta>' = rewrite \<beta>;
@@ -865,28 +864,49 @@ function(sequential) rewrite :: "Formula.formula \<Rightarrow> Formula.formula" 
                                                  in if prop_cond \<alpha>' \<beta>' 
                                                     then Formula.Or (Formula.And \<alpha>' \<beta>') (Formula.And \<alpha>' \<gamma>')
                                                     else Formula.And \<alpha>' (Formula.Or \<beta>' \<gamma>'))"  (*Maybe also a disjunction with prop_cond a' g'*)  
-(*2*)(*| "rewrite (Formula.And \<alpha> (release \<beta> I \<gamma>)) =(let \<alpha>' = rewrite \<alpha>;
+(*4*)| "rewrite (Formula.And \<alpha> (Formula.Exists \<beta>)) =(let \<alpha>' = rewrite \<alpha>;
+                                                    \<beta>' = rewrite \<beta>
+                                                in if prop_cond \<alpha>' \<beta>'  
+                                                 then Formula.Exists (Formula.And (shift \<alpha>') \<beta>')  
+                                                 else Formula.And \<alpha>' (Formula.Exists \<beta>'))"
+(*(*21*)| "rewrite (Formula.And \<alpha> (square_w I \<beta>)) =(let \<alpha>' = rewrite \<alpha>;
+                                                   \<beta>' = rewrite \<beta>
+                                                in if prop_cond \<alpha>' \<beta>'
+                                                 then Formula.And \<alpha>' (square_w I (Formula.And (diamond_b I \<alpha>') \<beta>'))
+                                                 else Formula.And \<alpha>' (square_w I \<beta>'))"
+(*2*)| "rewrite (Formula.And \<alpha> (release \<beta> I \<gamma>)) =(let \<alpha>' = rewrite \<alpha>;
                                                  \<beta>' = rewrite \<beta>;
                                                  \<gamma>' = rewrite \<gamma>
                                                 in if prop_cond \<alpha>' \<beta>' 
                                                  then Formula.And \<alpha>' (release (Formula.And \<beta>' (diamond_b (init_int I) \<alpha>')) I (Formula.And \<gamma>' (diamond_b I \<alpha>'))) 
                                                  else Formula.And \<alpha>' (release \<beta>' I \<gamma>'))"
+(*20*)| "rewrite (Formula.And \<alpha> (square_b I \<beta>)) =(let \<alpha>' = rewrite \<alpha>;
+                                                   \<beta>' = rewrite \<beta>
+                                                in if prop_cond \<alpha>' \<beta>'
+                                                 then Formula.And \<alpha>' (square_b I (Formula.And (diamond_w I \<alpha>' ) \<beta>'))
+                                                 else Formula.And \<alpha>' (square_b I \<beta>'))"
 (*3*)| "rewrite (Formula.And \<alpha> (trigger \<beta> I \<gamma>)) =(let \<alpha>' = rewrite \<alpha>;
                                                  \<beta>' = rewrite \<beta>;
                                                  \<gamma>' = rewrite \<gamma>
                                                 in if prop_cond \<alpha>' \<beta>'  
                                                  then Formula.And \<alpha>' (trigger (Formula.And \<beta>' (diamond_w (init_int I) \<alpha>')) I (Formula.And \<gamma>' (diamond_w I \<alpha>')))  
                                                  else Formula.And \<alpha>' (trigger \<beta>' I \<gamma>'))"*)
-(*4*)| "rewrite (Formula.And \<alpha> (Formula.Exists \<beta>)) =(let \<alpha>' = rewrite \<alpha>;
-                                                    \<beta>' = rewrite \<beta>
-                                                in if prop_cond \<alpha>' \<beta>'  
-                                                 then Formula.Exists (Formula.And (shift \<alpha>') \<beta>')  
-                                                 else Formula.And \<alpha>' (Formula.Exists \<beta>'))"
-(*5*)| "rewrite (Formula.And \<alpha> (Formula.Neg \<beta>)) =(let \<alpha>' = rewrite \<alpha>;
-                                                 \<beta>' = rewrite \<beta>
-                                                in if prop_cond \<alpha>' \<beta>'  
-                                                 then Formula.And \<alpha>' (Formula.Neg (Formula.And \<alpha>' \<beta>'))  
-                                                 else Formula.And \<alpha>' (Formula.Neg \<beta>'))"
+(*5*)| "rewrite (Formula.And \<alpha> (Formula.Neg \<beta>)) =(let \<alpha>' = rewrite \<alpha> 
+                                                  in (case \<beta> of
+                                                    Formula.Until (Formula.Neg \<beta>'') I (Formula.Neg \<gamma>'') \<Rightarrow>
+                                                           (let \<beta>' = rewrite \<beta>'';
+                                                                \<gamma>' = rewrite \<gamma>''
+                                                            in if prop_cond \<alpha>' \<beta>' 
+                                                                  then Formula.And \<alpha>' (release (Formula.And \<beta>' (diamond_b (init_int I) \<alpha>')) 
+                                                                                                I 
+                                                                                               (Formula.And \<gamma>' (diamond_b I \<alpha>'))) 
+                                                                  else Formula.And \<alpha>' (release \<beta>' I \<gamma>'))
+                                                    | _ \<Rightarrow> let \<beta>' = rewrite \<beta>
+                                                           in if prop_cond \<alpha>' \<beta>'  
+                                                                then Formula.And \<alpha>' (Formula.Neg (Formula.And \<alpha>' \<beta>'))  
+                                                                else Formula.And \<alpha>' (Formula.Neg \<beta>')))"
+
+
 (*6*)| "rewrite (Formula.Since (Formula.And \<alpha> \<gamma>) I \<beta> ) =(let \<alpha>' = rewrite \<alpha>;
                                                         \<beta>' = rewrite \<beta>;
                                                         \<gamma>' = rewrite \<gamma>
@@ -945,16 +965,7 @@ function(sequential) rewrite :: "Formula.formula \<Rightarrow> Formula.formula" 
                                                 in if prop_cond \<alpha>' \<beta>'
                                                  then Formula.And \<alpha>' (diamond_w I (Formula.And (diamond_b I \<alpha>') \<beta>'))
                                                  else Formula.And \<alpha>' (diamond_w I \<beta>'))"  *) (*INSERT AGAIN*)
-(*20*)(*| "rewrite (Formula.And \<alpha> (square_b I \<beta>)) =(let \<alpha>' = rewrite \<alpha>;
-                                                   \<beta>' = rewrite \<beta>
-                                                in if prop_cond \<alpha>' \<beta>'
-                                                 then Formula.And \<alpha>' (square_b I (Formula.And (diamond_w I \<alpha>' ) \<beta>'))
-                                                 else Formula.And \<alpha>' (square_b I \<beta>'))"
-(*21*)| "rewrite (Formula.And \<alpha> (square_w I \<beta>)) =(let \<alpha>' = rewrite \<alpha>;
-                                                   \<beta>' = rewrite \<beta>
-                                                in if prop_cond \<alpha>' \<beta>'
-                                                 then Formula.And \<alpha>' (square_w I (Formula.And (diamond_b I \<alpha>') \<beta>'))
-                                                 else Formula.And \<alpha>' (square_w I \<beta>'))" *)
+
 (*22*)| "rewrite (Formula.And \<alpha> (Formula.Prev I \<beta>)) =(let \<alpha>' = rewrite \<alpha>;
                                                       \<beta>' = rewrite \<beta>
                                                 in if prop_cond \<alpha>' \<beta>'
@@ -965,9 +976,13 @@ function(sequential) rewrite :: "Formula.formula \<Rightarrow> Formula.formula" 
                                                 in if prop_cond \<alpha>' \<beta>'
                                                  then Formula.And \<alpha>' (Formula.Next I (Formula.And (Formula.Prev I \<alpha>') \<beta>'))
                                                  else Formula.And \<alpha>' (Formula.Next I \<beta>'))"
-| "rewrite f = f"
-by (pat_completeness) auto
+| "rewrite f = f "
+  by pat_completeness auto
 termination by lexicographic_order
+
+(*fun_cases my_elim: "rewrite \<alpha>"*)
+
+thm formula.splits
 
 lemma rewrite_sat: "Formula.sat \<sigma> V v i (rewrite \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
 proof(induction \<alpha> arbitrary: v i rule:rewrite.induct)
@@ -977,29 +992,43 @@ next
   case (2 \<alpha> \<beta>)  (*4*)
   then show ?case by(simp only: rewrite.simps shiftI.simps sat_rewrite_4[symmetric] Let_def split:if_splits;simp) 
 next
-  case (3 \<alpha> \<beta>) (*5*)
+(*
+  case (3)
+  then show ?case by (simp only:rewrite.simps Let_def sat_rewrite_21[symmetric] split:if_splits;simp)
+next
+  case (4 \<alpha> \<beta> I \<gamma>) (*2*)
+  then show ?case by (simp only:rewrite.simps Let_def sat_rewrite_2[symmetric] split:if_splits;simp)
+next
+  case (5) (*20*)
+  then show ?case by (simp only:rewrite.simps Let_def sat_rewrite_20[symmetric] split:if_splits;simp)
+next
+  case (6 \<alpha> \<beta> I \<gamma>)
+  then show ?case by (simp only:rewrite.simps Let_def sat_rewrite_3[symmetric] split:if_splits;simp)
+next
+  case (7 \<alpha> \<beta>)
   then show ?case by (simp add: Let_def sat_rewrite_5;auto)
 next
-  case (4 \<alpha> \<gamma> I \<beta>) (*6*)
+  case l:(8 \<alpha> \<gamma> I \<beta>) (*6*)
   then show ?case  
   proof(cases "excl_zero I")
     thm sat_rewrite_6[symmetric]
     case True
-    then show ?thesis using 4 by (simp only:rewrite.simps Let_def sat_rewrite_6[OF True,symmetric] split:if_splits;simp)
+    then show ?thesis using l by (simp only:rewrite.simps Let_def sat_rewrite_6[OF True,symmetric] split:if_splits;simp)
   next
     case False
-    then show ?thesis using 4 by simp
+    then show ?thesis using l by simp
   qed
 next
-  case (5 \<alpha> \<gamma> I \<beta>) (*7*)
+  case l:(9 \<alpha> \<gamma> I \<beta>) (*7*)
   then show ?case
   proof(cases "excl_zero I")
     case True
-    then show ?thesis using 5 by (simp only:rewrite.simps Let_def sat_rewrite_7[OF True,symmetric] split:if_splits;simp)
+    then show ?thesis using l by (simp only:rewrite.simps Let_def sat_rewrite_7[OF True,symmetric] split:if_splits;simp)
   next
     case False
-    then show ?thesis using 5 by simp
+    then show ?thesis using l by simp
   qed
+next
 (*next
   case (8 \<beta> I \<alpha> \<gamma>)
   then show ?case by (simp only:rewrite8.simps Let_def sat_rewrite_8[symmetric] split:if_splits;simp)
@@ -1007,10 +1036,10 @@ next
   case (9 \<beta> I \<alpha> \<gamma>)
   then show ?case by (simp only:rewrite9.simps Let_def sat_rewrite_9[symmetric] split:if_splits;simp)*)
 next
-  case (6 \<alpha> \<beta> I \<gamma>) (*10*)
+  case (10 \<alpha> \<beta> I \<gamma>) (*10*)
   then show ?case by (simp only:rewrite.simps Let_def sat_rewrite_10[symmetric] split:if_splits;simp)
 next
-  case (7 \<beta> I \<alpha> \<gamma>) (*11*)
+  case (11 \<beta> I \<alpha> \<gamma>) (*11*)
   then show ?case by (simp only:rewrite.simps Let_def sat_rewrite_11[symmetric] split:if_splits;simp)
 (*next
   case (12)
@@ -1031,16 +1060,21 @@ next
   case (21)
   then show ?case by (simp only:rewrite21.simps Let_def sat_rewrite_21[symmetric] split:if_splits;simp)*)
 next
-  case (8) (*22*)
+  case (12) (*22*)
   then show ?case by (simp only:rewrite.simps Let_def sat_rewrite_22[symmetric] split:if_splits ;simp split:nat.splits)
 next
-  case (9) (*23*)
+  case (13) (*23*)
   then show ?case by (simp only:rewrite.simps Let_def sat_rewrite_23[symmetric] split:if_splits;simp)
+*)
 qed auto
 
 
 
-
+(*5*)| "rewrite (Formula.And \<alpha> (Formula.Neg \<beta>)) =(let \<alpha>' = rewrite \<alpha>;
+                                                      \<beta>' = rewrite \<beta>
+                                                in if prop_cond \<alpha>' \<beta>'  
+                                                 then Formula.And \<alpha>' (Formula.Neg (Formula.And \<alpha>' \<beta>'))  
+                                                 else Formula.And \<alpha>' (Formula.Neg \<beta>'))"
 
 
 
