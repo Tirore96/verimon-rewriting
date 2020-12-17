@@ -13,6 +13,194 @@ definition propagate_cond where
       in  (rr1 \<inter> (fv2 \<setminus> rr2)) \<supset> \<emptyset> )"
 *)
 
+(*fun tvars :: "Formula.trm \<Rightarrow> nat set" where
+  "tvars (Var x) = (if b \<le> x then {x} else {})"
+| "tvars (Const _) = {}"
+| "tvars (Plus x y) = tvars b x \<union> tvars b y"
+| "tvars (Minus x y) = tvars b x \<union> tvars b y"
+| "tvars (UMinus x) = tvars b x"
+| "tvars (Mult x y) = tvars b x \<union> tvars b y"
+| "tvars (Div x y) = tvars b x \<union> tvars b y"
+| "tvars (Mod x y) = tvars b x \<union> tvars b y"
+| "tvars (F2i x) = tvars b x"
+| "tvars (I2f x) = tvars b x"*)
+
+
+primrec rr_regex where
+  "rr_regex rr (Regex.Skip n) = {}"
+| "rr_regex rr (Regex.Test \<phi>) = rr \<phi>"
+| "rr_regex rr (Regex.Plus r s) = rr_regex rr r \<union> rr_regex rr s"
+| "rr_regex rr (Regex.Times r s) = rr_regex rr r \<union> rr_regex rr s"
+| "rr_regex rr (Regex.Star r) = rr_regex rr r"
+
+
+fun rr :: "nat \<Rightarrow> Formula.formula \<Rightarrow> nat set" where
+  "rr b (Formula.Pred r ts) = (\<Union>t\<in>set ts. Formula.fvi_trm b t)"
+| "rr b (Formula.Let p _ \<phi> \<psi>) = rr b \<psi>"
+| "rr  b(Formula.Eq t1 t2) = (case (t1,t2) of
+                             (Formula.Var x,Formula.Const _) \<Rightarrow> {x-b}
+                            |(Formula.Const _,Formula.Var x) \<Rightarrow> {x-b}
+                            | _ \<Rightarrow> {})"
+
+| "rr b (Formula.Less t1 t2) = (case (t1,t2) of
+                                              (Formula.Var x,Formula.Const _) \<Rightarrow> {x-b}
+                                             |_ \<Rightarrow> {})"
+| "rr b (Formula.LessEq t1 t2) = (case (t1,t2) of
+                                              (Formula.Var x,Formula.Const _) \<Rightarrow> {x-b}
+                                             |_ \<Rightarrow> {})"
+| "rr b (Formula.Or \<phi> \<psi>) = rr b \<phi> \<inter> rr b \<psi>"
+| "rr b (Formula.And \<phi> \<psi>) = rr b \<phi> \<union> rr b \<psi>"
+| "rr b (Formula.Ands \<phi>s) = (let xs = map (rr b) \<phi>s in \<Union>x\<in>set xs. x)"
+| "rr b (Formula.Exists \<phi>) = (if (0 \<in> rr 0 \<phi>) then rr (Suc b) \<phi>
+                                            else {})"
+| "rr b (Formula.Agg y \<omega> b' f \<phi>) = {}" (*How?*)
+| "rr b (Formula.Prev I \<phi>) = rr b \<phi>"
+| "rr b (Formula.Next I \<phi>) = rr b \<phi>"
+| "rr b (Formula.Since \<phi> I \<psi>) = rr b \<psi>"
+| "rr b (Formula.Until \<phi> I \<psi>) = rr b \<psi>"
+(*| "rr b (Formula.MatchF I r) = rr_regex (rr b) r"
+| "rr b (Formula.MatchP I r) = rr_regex (rr b) r"   Termination issues*)
+| "rr b (Formula.Neg \<beta>) = (case \<beta> of
+                            Formula.Until (Formula.Neg \<beta>) I (Formula.Neg \<gamma>) \<Rightarrow> rr b \<gamma>
+                           |Formula.Since (Formula.Neg \<beta>) I (Formula.Neg \<gamma>) \<Rightarrow> rr b \<gamma> )"  (*release and trigger cases*)
+| "rr b (formula.MatchF I r) = {}"
+| "rr b (formula.MatchP I r) = {}"
+
+definition "prop_cond f1 f2 =
+       (let rr1 = rr 0 f1;
+           rr2 = rr 0 f2; 
+           fv2 = Formula.fv f2 
+       in  (rr1 \<inter> (fv2-rr2)) \<noteq> {})"
+
+
+(*let rec rr = function
+  | Pred p -> (Predicate.pvars p, true)
+
+  | Equal (t1, t2) ->
+    (match t1, t2 with
+     | Var x, Cst c -> ([x], true)
+     | Cst c, Var x -> ([x], true)
+     | _ -> ([], true) )
+  | Less (t1, t2) ->
+    (match t1, t2 with
+     | Var x, Var y when x=y -> ([x], true)
+     | Var x, Cst c -> ([x], true)
+     | _ -> ([], true))
+  | LessEq (t1, t2) ->
+    (match t1, t2 with
+     | Var x, Cst c -> ([x], true)
+     | _ -> ([], true))
+
+  | Neg (Equal (t1, t2)) ->
+    (match t1, t2 with
+     | Var x, Var y when x=y -> ([x], true)
+     | _ -> ([], true))
+  | Neg (Less (t1, t2)) ->
+    (match t1, t2 with
+     | Cst c, Var x -> ([x], true)
+     | _ -> ([], true))
+  | Neg (LessEq (t1, t2)) ->
+    (match t1, t2 with
+     | Var x, Var y when x=y -> ([x], true)
+     | Cst c, Var x -> ([x], true)
+     | _ -> ([], true))
+
+  | Neg f ->
+    let _, b = rr f in
+    ([], b)
+
+  | And (f1, Equal (Var x, Var y)) ->
+    let (rr1, b) = rr f1 in
+    if List.mem x rr1 then
+      (Misc.union rr1 [y], b)
+    else if List.mem y rr1 then
+      (Misc.union rr1 [x], b)
+    else
+      (rr1, b)
+
+  | And (f1, Less (Var x, Var y)) ->
+    let (rr1, b) = rr f1 in
+    if List.mem y rr1  || x = y then
+      (Misc.union rr1 [x], b)
+    else
+      (rr1, b)
+
+  | And (f1, Neg (Less (Var x, Var y))) ->
+    let (rr1, b) = rr f1 in
+    if List.mem x rr1 then
+      (Misc.union rr1 [y], b)
+    else
+      (rr1, b)
+
+  | And (f1, (LessEq (t1, t2)))
+  | And (f1, Neg (LessEq (t1, t2))) ->
+    let (rr1, b) = rr f1 in
+    if b then
+      let vars1 = Predicate.tvars t1 in
+      let vars2 = Predicate.tvars t2 in
+      (rr1, (Misc.subset vars1 rr1) &&
+            (Misc.subset vars2 rr1))
+    else
+      (rr1, b)
+  (* failwith "[Rewriting.rr] not yet" *)
+
+  | And (f1, f2) ->
+    let (rr1, b1) = rr f1 in
+    let (rr2, b2) = rr f2 in
+    (Misc.union rr1 rr2, b1 && b2)
+
+  | Or (f1, f2) ->
+    let (rr1, b1) = rr f1 in
+    let (rr2, b2) = rr f2 in
+    (List.filter (fun v -> List.mem v rr1) rr2, b1 && b2)
+
+  | Exists (vl, f) ->
+    let (rrf, b) = rr f in
+    let rec aux crt_rrf crt_b = function
+      | [] -> crt_rrf, crt_b
+      | v :: rest ->
+        if List.mem v crt_rrf then
+          let new_rrf = List.filter (fun x -> x<>v) crt_rrf in
+          aux new_rrf crt_b rest
+        else
+          crt_rrf, false
+    in
+    aux rrf b vl
+  (* if List.mem v rrf then *)
+  (*   (List.filter (fun x -> x<>v) rrf, b) *)
+  (* else *)
+  (*   (rrf, false) *)
+
+  | Aggreg (ytyp, y, op, x, glist, f) ->
+    let rrf, b = rr f in
+    let frr = List.filter (fun z -> List.mem z glist) rrf in
+    y :: frr, b
+
+  | Prev (intv, f) -> rr f
+  | Next (intv, f) -> rr f
+  | Eventually (intv, f) -> rr f
+  | Once (intv, f) -> rr f
+
+  | Since (intv, f1, f2)
+  | Until (intv, f1, f2) ->
+    let _, b1 = rr f1 in
+    let rr2, b2 = rr f2 in
+    (rr2, b1 && b2)
+  | Frex (_,r) -> rr_re true r 
+  | Prex (_,r) -> rr_re false r 
+  | Let (_,_,f) -> rr f
+  | _ -> failwith "[Rewriting.rr] internal error"
+  and rr_re future = function 
+  | Wild -> ([],true)
+  | Test f -> rr f
+  | Concat (r1,r2) -> let (rr1,b1) = rr_re future r1 in
+                      let (rr2,b2) = rr_re future r2 in
+                      (rr2, b1 && b2)
+  | Plus (r1, r2) ->  let (rr1,b1) = rr_re future r1 in
+                      let (rr2,b2) = rr_re future r2 in
+                      (List.filter (fun v -> List.mem v rr1) rr2, b1 && b2)
+  | Star r -> rr_re future r*)
+
 
 (*Section 2 of Normalization*)
 lemma sat_2_1: "(\<forall>x. Formula.sat \<sigma> V (x#v) i \<alpha>) = Formula.sat \<sigma> V v i (Formula.Neg (Formula.Exists (Formula.Neg \<alpha>)))" by simp
@@ -519,9 +707,7 @@ qed auto
 
 (*lemma eval_cong[cong]: "\<And>P::(Formula.trm \<Rightarrow> Formula.trm). (Formula.eval_trm v t = Formula.eval_trm v t') \<Longrightarrow> Formula.eval_trm v (P t) =  Formula.eval_trm v (P t')" sorry
 lemma sat_cong[cong]: "(Formula.sat \<sigma> V v i \<alpha> = Formula.sat \<sigma> V v i \<beta>) \<Longrightarrow> Formula.sat \<sigma> V v i (P \<alpha>) = Formula.sat \<sigma> V v i (P \<beta>)" sorry*)
-thm arg_cong
-definition prop_cond:: "Formula.formula \<Rightarrow> Formula.formula \<Rightarrow> bool" where
-  "prop_cond a b = True"
+
 (*future lemma, set of range restricted variables is same or less after rewrite*)
 
 
