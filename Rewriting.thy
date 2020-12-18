@@ -705,11 +705,46 @@ proof(rule iffI)
   then show ?R using L j by fastforce
 qed auto
 
+(*
+datatype "constant" = SINCE | UNTIL \<I> | NEG
+
+datatype 'c "term" = App 'c "'c term list"
+
+datatype ('c, 'x) "pattern" = Var 'x | PApp 'c "('c, 'x) pattern list"
+
+fun matches where
+  "matches [] [] \<sigma> = Some \<sigma>"
+| "matches (Var x # ps) (t # ts) \<sigma> =
+     (case \<sigma> x of
+       None \<Rightarrow> matches ps ts ((\<sigma>(x \<mapsto> t)))
+     | Some u \<Rightarrow> if t = u then matches ps ts \<sigma> else None)"
+| "matches (PApp c ps # ps') (App d ts # ts') \<sigma> = (if c = d \<and> length ps = length ts then 
+     matches (ps @ ps') (ts @ ts') \<sigma> else None)"
+| "matches _ _ \<sigma> = None"
+
+fun instantiate where
+  "instantiate \<sigma> (Var x) = the (\<sigma> x)"
+| "instantiate \<sigma> (PApp c ps) = App c (map (instantiate \<sigma>) ps)"
+
+fun rewrite1 :: "(('c, 'x) pattern \<times> ('c, 'x) pattern) list \<Rightarrow> 'c term \<Rightarrow> 'c term" where
+  "rewrite1 [] t = t"
+| "rewrite1 ((p, u) # rs) t =
+   (case matches [p] [t] Map.empty of
+     Some \<sigma> \<Rightarrow> instantiate \<sigma> u
+   | None \<Rightarrow> rewrite1 rs t)"
+
+fun rewrite :: "(('c, 'x) pattern \<times> ('c, 'x) pattern) list \<Rightarrow> 'c term \<Rightarrow> 'c term" where
+  "rewrite rs (App c ts) = rewrite1 rs (App c (map (rewrite rs) ts))"
+
+fun embed where
+  "embed (Formula.Until \<phi> I \<psi>) = App (UNTIL I) [embed \<phi>, embed \<psi>]"
+*)
+
+
 (*lemma eval_cong[cong]: "\<And>P::(Formula.trm \<Rightarrow> Formula.trm). (Formula.eval_trm v t = Formula.eval_trm v t') \<Longrightarrow> Formula.eval_trm v (P t) =  Formula.eval_trm v (P t')" sorry
 lemma sat_cong[cong]: "(Formula.sat \<sigma> V v i \<alpha> = Formula.sat \<sigma> V v i \<beta>) \<Longrightarrow> Formula.sat \<sigma> V v i (P \<alpha>) = Formula.sat \<sigma> V v i (P \<beta>)" sorry*)
 
 (*future lemma, set of range restricted variables is same or less after rewrite*)
-
 
 (*
 fun rewrite1 :: "Formula.formula \<Rightarrow> Formula.formula" where
@@ -1042,6 +1077,35 @@ proof(induction \<alpha> arbitrary: i rule:rewrite23.induct)
 qed auto
 *)
 
+term "case xs of [] \<Rightarrow> 0 | x # xs \<Rightarrow> 1"
+term "case_list 0 (\<lambda>x xs. 1) xs"
+
+fun rewrite :: "Formula.formula \<Rightarrow> Formula.formula" where
+  "rewrite f = (case f of
+     Formula.And \<alpha> (Formula.Or \<beta> \<gamma>) \<Rightarrow>
+       (if prop_cond \<alpha> \<beta>
+       then Formula.Or (rewrite (Formula.And \<alpha> \<beta>)) (rewrite (Formula.And \<alpha> \<gamma>))
+       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in Formula.And \<alpha>' (Formula.Or \<beta>' \<gamma>'))
+   | _ \<Rightarrow> f)"
+
+lemma rewrite_sat: "Formula.sat \<sigma> V v i (rewrite \<alpha>) = Formula.sat \<sigma> V v i \<alpha>"
+  apply (induct \<alpha> rule: rewrite.induct)
+  apply (subst rewrite.simps)
+(*
+  apply (simp only: simp_thms formula.inject split_paired_All split formula.splits if_splits)
+  find_theorems "(_ \<and> _ \<longleftrightarrow> _) = _"
+  apply (intro allI impI conjI)
+*)
+(*
+  using [[simp_trace_new mode=full]]
+  using [[simproc del: let_simp]]
+*)
+  apply (simp del: rewrite.simps sat.simps add: sat_rewrite_1 
+    split: formula.splits if_splits)
+  apply (intro allI impI conjI)
+  apply simp_all
+  done
+
 
 function(sequential) rewrite :: "Formula.formula \<Rightarrow> Formula.formula" where
 (*1*)  "rewrite (Formula.And \<alpha> (Formula.Or \<beta> \<gamma>)) = (let \<alpha>' = rewrite \<alpha>;
@@ -1165,6 +1229,7 @@ function(sequential) rewrite :: "Formula.formula \<Rightarrow> Formula.formula" 
 | "rewrite f = f "
   by pat_completeness auto
 termination by lexicographic_order
+
 
 (*fun_cases my_elim: "rewrite \<alpha>"*)
 
