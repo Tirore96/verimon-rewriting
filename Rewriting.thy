@@ -1,8 +1,42 @@
-  theory Rewriting
+theory Rewriting
     imports "MFODL_Monitor_Optimized.Formula" "MFODL_Monitor_Optimized.Regex" "MFODL_Monitor_Optimized.Trace"
 begin
 
+datatype (discs_sels) rformula = RPred Formula.name "Formula.trm list"
+  | RLet Formula.name nat rformula rformula
+  | REq Formula.trm Formula.trm | RLess Formula.trm Formula.trm | RLessEq Formula.trm Formula.trm
+  | RNeg rformula | ROr rformula rformula | RAnd rformula rformula | RAnds "rformula list"
+  | RExists rformula | RForall rformula
+  | RAgg nat Formula.agg_op nat Formula.trm rformula
+  | RPrev \<I> rformula | RNext \<I> rformula
+  | RSince rformula \<I> rformula | RUntil rformula \<I> rformula
+  | RRelease rformula \<I> rformula | RTrigger rformula \<I> rformula
+  | RDiamondB \<I> rformula | RSquareB \<I> rformula
+  | RDiamondW \<I> rformula | RSquareW \<I> rformula
+  | RMatchF \<I> "rformula Regex.regex" | RMatchP \<I> "rformula Regex.regex"
 
+abbreviation TT where "TT \<equiv> Formula.Eq (Formula.Const (EInt (0 :: integer))) (Formula.Const (EInt 0))"
+abbreviation FF where "FF \<equiv> Formula.Neg TT"
+
+fun embed :: "Formula.formula \<Rightarrow> rformula" where
+  "embed (Formula.Pred t ts) = RPred t ts"
+| "embed (Formula.Let p b \<phi> \<psi>) = RLet p b (embed \<phi>) (embed \<psi>)"
+| "embed (Formula.Neg (Formula.Neg \<phi>)) = embed \<phi>"
+| "embed (Formula.Neg (Formula.Exists \<phi>)) = RForall (embed (Formula.Neg \<phi>))"
+| "embed (Formula.Neg (Formula.Since \<phi> I \<psi>)) = (if \<phi> = TT then 
+    RSquareB I (embed (Formula.Neg \<psi>)) else RTrigger (embed (Formula.Neg \<phi>)) I (embed (Formula.Neg \<psi>)))"
+| "embed (Formula.Neg (Formula.Until \<phi> I \<psi>)) =  (if \<phi> = TT then 
+    RSquareW I (embed (Formula.Neg \<psi>)) else RRelease (embed (Formula.Neg \<phi>)) I (embed (Formula.Neg \<psi>)))"
+
+fun project :: "rformula \<Rightarrow> Formula.formula" where
+  "project (RPred t ts) = Formula.Pred t ts"
+| "project (RLet p b \<phi> \<psi>) = Formula.Let p b (project \<phi>) (project \<psi>)"
+
+definition rsat where "rsat \<sigma> V v i \<phi> = Formula.sat \<sigma> V v i (project \<phi>)"
+
+lemma "rsat \<sigma> V v i (embed \<phi>) = Formula.sat \<sigma> V v i \<phi>"
+  apply (induct \<phi> arbitrary: V v i rule: embed.induct)
+  apply (auto simp: rsat_def)
 
 (*
 definition propagate_cond where
@@ -62,7 +96,8 @@ fun rr :: "nat \<Rightarrow> Formula.formula \<Rightarrow> nat set" where
 | "rr b (Formula.MatchP I r) = rr_regex (rr b) r"   Termination issues*)
 | "rr b (Formula.Neg \<beta>) = (case \<beta> of
                             Formula.Until (Formula.Neg \<beta>) I (Formula.Neg \<gamma>) \<Rightarrow> rr b \<gamma>
-                           |Formula.Since (Formula.Neg \<beta>) I (Formula.Neg \<gamma>) \<Rightarrow> rr b \<gamma> )"  (*release and trigger cases*)
+                           |Formula.Since (Formula.Neg \<beta>) I (Formula.Neg \<gamma>) \<Rightarrow> rr b \<gamma>
+                           | _ \<Rightarrow> {} )"  (*release and trigger cases*)
 | "rr b (formula.MatchF I r) = {}"
 | "rr b (formula.MatchP I r) = {}"
 
@@ -384,8 +419,6 @@ lemma sat_3_d: "Formula.sat \<sigma> V v i (Formula.Neg (Formula.Next I \<alpha>
   by auto
 
 (*Abbreviations corresponding to syntactic sugar presented in the phd-thesis*)
-abbreviation FF where "FF \<equiv> Formula.Exists (Formula.Neg (Formula.Eq (Formula.Var 0) (Formula.Var 0)))"
-abbreviation TT where "TT \<equiv> Formula.Neg FF"
 lemma FF_simp: "FF = Formula.FF" by (simp add: Formula.FF_def)
 lemma TT_simp: "TT = Formula.TT" by (simp add: Formula.TT_def FF_simp)
 
@@ -1095,6 +1128,15 @@ function(sequential) rewrite :: "Formula.formula \<Rightarrow> Formula.formula" 
 | "rewrite f = f"
   by pat_completeness auto
 termination by (relation "measure size") (auto simp add: shift_size)
+
+lemma rewrite_sat: "Formula.sat \<sigma> V v i (rewrite \<alpha>) = Formula.sat \<sigma> V v i \<alpha>"
+  apply(induct \<alpha> arbitrary:  v rule: rewrite.induct)
+
+    apply (subst rewrite.simps shiftI.simps)
+    apply(simp only: Let_def  split: formula.splits if_splits )
+    apply(simp only: sat_rewrite_1 sat_rewrite_4[symmetric] sat_rewrite_5[symmetric])
+                      apply(auto simp: sat_shift[of "[]" 0, simplified])
+  sorry
 
 
 fun rewriteo :: "Formula.formula \<Rightarrow> Formula.formula" where
