@@ -1101,15 +1101,15 @@ fun rewriteo :: "Formula.formula \<Rightarrow> Formula.formula" where
   "rewriteo ( Formula.And \<alpha> (Formula.Or \<beta> \<gamma>)) =
        (if prop_cond \<alpha> \<beta>
        then Formula.Or ((Formula.And \<alpha> \<beta>)) ((Formula.And \<alpha> \<gamma>))
-       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in Formula.And \<alpha>' (Formula.Or \<beta>' \<gamma>'))"
+       else let \<alpha>' = rewriteo \<alpha>; \<beta>' = rewriteo \<beta>;  \<gamma>' = rewriteo \<gamma> in Formula.And \<alpha>' (Formula.Or \<beta>' \<gamma>'))"
 | "rewriteo (Formula.And \<alpha> (Formula.Exists \<beta>)) = 
        (if prop_cond \<alpha> \<beta>  
         then Formula.Exists ((Formula.And (shift \<alpha>) \<beta>))
-        else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in Formula.And \<alpha>' (Formula.Exists \<beta>'))"
+        else let \<alpha>' = rewriteo \<alpha>; \<beta>' = rewriteo \<beta> in Formula.And \<alpha>' (Formula.Exists \<beta>'))"
 | "rewriteo (Formula.And \<alpha> (Formula.Neg \<beta>)) =
       (if prop_cond \<alpha> \<beta>  
        then Formula.And \<alpha> ((Formula.Neg ((Formula.And \<alpha> \<beta>))))  
-       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in Formula.And \<alpha>' (Formula.Neg \<beta>'))"
+       else let \<alpha>' = rewriteo \<alpha>; \<beta>' = rewriteo \<beta> in Formula.And \<alpha>' (Formula.Neg \<beta>'))"
 | "rewriteo f = f"
 
 (*Same functions in Case-expression form*)
@@ -1151,17 +1151,20 @@ function rewriteo :: "Formula.formula \<Rightarrow> Formula.formula" where
 termination by (relation "measure size") (auto simp add: shift_size)*)
 
 lemma o_to_sat: "Formula.sat \<sigma> V v i (rewriteo \<alpha>) = Formula.sat \<sigma> V v i \<alpha>"
-proof(induct \<alpha> arbitrary: v rule: rewrite.induct)
+proof(induct \<alpha> arbitrary: v rule: rewriteo.induct)
 case (1 \<alpha> \<beta> \<gamma>)
   then show ?case 
     apply(subst rewriteo.simps shiftI.simps)
-    apply(simp only: Let_def if_bool_eq_conj)
-    apply(simp only: sat_rewrite_1)
-    apply(simp only: sat.simps)
-    sorry
+    apply(simp only: Let_def split:if_splits)
+    apply(simp only: sat_rewrite_1;simp)    
+    done
 next
   case (2 \<alpha> \<beta>)
-then show ?case sorry
+  then show ?case 
+    apply(subst rewriteo.simps shiftI.simps)
+    apply(simp only: Let_def split:if_splits)
+    apply(simp only: sat_rewrite_4[symmetric];simp)    
+    done
 next
 case (3 \<alpha> \<beta>)
   then show ?case sorry
