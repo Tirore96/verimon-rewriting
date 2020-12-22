@@ -1079,7 +1079,42 @@ qed auto
 
 lemma shift_size: "size (shift \<alpha>) = size \<alpha>" sorry
 
-function rewrite :: "Formula.formula \<Rightarrow> Formula.formula" where
+function(sequential) rewrite :: "Formula.formula \<Rightarrow> Formula.formula" where
+  "rewrite ( Formula.And \<alpha> (Formula.Or \<beta> \<gamma>)) =
+       (if prop_cond \<alpha> \<beta>
+       then Formula.Or (rewrite (Formula.And \<alpha> \<beta>)) (rewrite (Formula.And \<alpha> \<gamma>))
+       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in Formula.And \<alpha>' (Formula.Or \<beta>' \<gamma>'))"
+| "rewrite (Formula.And \<alpha> (Formula.Exists \<beta>)) = 
+       (if prop_cond \<alpha> \<beta>  
+        then Formula.Exists (rewrite (Formula.And (shift \<alpha>) \<beta>))
+        else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in Formula.And \<alpha>' (Formula.Exists \<beta>'))"
+| "rewrite (Formula.And \<alpha> (Formula.Neg \<beta>)) =
+      (if prop_cond \<alpha> \<beta>  
+       then Formula.And \<alpha> ((Formula.Neg (rewrite (Formula.And \<alpha> \<beta>))))  
+       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in Formula.And \<alpha>' (Formula.Neg \<beta>'))"
+| "rewrite f = f"
+  by pat_completeness auto
+termination by (relation "measure size") (auto simp add: shift_size)
+
+
+fun rewriteo :: "Formula.formula \<Rightarrow> Formula.formula" where
+  "rewriteo ( Formula.And \<alpha> (Formula.Or \<beta> \<gamma>)) =
+       (if prop_cond \<alpha> \<beta>
+       then Formula.Or ((Formula.And \<alpha> \<beta>)) ((Formula.And \<alpha> \<gamma>))
+       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in Formula.And \<alpha>' (Formula.Or \<beta>' \<gamma>'))"
+| "rewriteo (Formula.And \<alpha> (Formula.Exists \<beta>)) = 
+       (if prop_cond \<alpha> \<beta>  
+        then Formula.Exists ((Formula.And (shift \<alpha>) \<beta>))
+        else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in Formula.And \<alpha>' (Formula.Exists \<beta>'))"
+| "rewriteo (Formula.And \<alpha> (Formula.Neg \<beta>)) =
+      (if prop_cond \<alpha> \<beta>  
+       then Formula.And \<alpha> ((Formula.Neg ((Formula.And \<alpha> \<beta>))))  
+       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in Formula.And \<alpha>' (Formula.Neg \<beta>'))"
+| "rewriteo f = f"
+
+(*Same functions in Case-expression form*)
+
+(*function rewrite :: "Formula.formula \<Rightarrow> Formula.formula" where
   "rewrite f = (case f of
      Formula.And \<alpha> (Formula.Or \<beta> \<gamma>) \<Rightarrow>
        (if prop_cond \<alpha> \<beta>
@@ -1091,27 +1126,69 @@ function rewrite :: "Formula.formula \<Rightarrow> Formula.formula" where
         else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in Formula.And \<alpha>' (Formula.Exists \<beta>'))
      | Formula.And \<alpha> (Formula.Neg \<beta>) \<Rightarrow>
       (if prop_cond \<alpha> \<beta>  
-       then Formula.And \<alpha> (Formula.Neg (Formula.And \<alpha> \<beta>))  
+       then Formula.And \<alpha> ((Formula.Neg (rewrite (Formula.And \<alpha> \<beta>))))  
        else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in Formula.And \<alpha>' (Formula.Neg \<beta>'))
    | _ \<Rightarrow> f)"
   by pat_completeness auto
 termination by (relation "measure size") (auto simp add: shift_size)
 
-thm sat.simps[symmetric]
+function rewriteo :: "Formula.formula \<Rightarrow> Formula.formula" where
+  "rewriteo f = (case f of
+     Formula.And \<alpha> (Formula.Or \<beta> \<gamma>) \<Rightarrow>
+       (if prop_cond \<alpha> \<beta>
+       then Formula.Or (Formula.And \<alpha> \<beta>) (Formula.And \<alpha> \<gamma>)
+       else let \<alpha>' = rewriteo \<alpha>; \<beta>' = rewriteo \<beta>;  \<gamma>' = rewriteo \<gamma> in Formula.And \<alpha>' (Formula.Or \<beta>' \<gamma>'))
+     | Formula.And \<alpha> (Formula.Exists \<beta>) \<Rightarrow>
+       (if prop_cond \<alpha> \<beta>  
+        then Formula.Exists (Formula.And (shift \<alpha>) \<beta>)
+        else let \<alpha>' = rewriteo \<alpha>; \<beta>' = rewriteo \<beta> in Formula.And \<alpha>' (Formula.Exists \<beta>'))
+     | Formula.And \<alpha> (Formula.Neg \<beta>) \<Rightarrow>
+      (if prop_cond \<alpha> \<beta>  
+       then Formula.And \<alpha> (Formula.Neg (Formula.And \<alpha> \<beta>))  
+       else let \<alpha>' = rewriteo \<alpha>; \<beta>' = rewriteo \<beta> in Formula.And \<alpha>' (Formula.Neg \<beta>'))
+   | _ \<Rightarrow> f)"
+  by pat_completeness auto
+termination by (relation "measure size") (auto simp add: shift_size)*)
+
+lemma o_to_sat: "Formula.sat \<sigma> V v i (rewriteo \<alpha>) = Formula.sat \<sigma> V v i \<alpha>"
+proof(induct \<alpha> arbitrary: v rule: rewrite.induct)
+case (1 \<alpha> \<beta> \<gamma>)
+  then show ?case 
+    apply(subst rewriteo.simps shiftI.simps)
+    apply(simp only: Let_def if_bool_eq_conj)
+    apply(simp only: sat_rewrite_1)
+    apply(simp only: sat.simps)
+    sorry
+next
+  case (2 \<alpha> \<beta>)
+then show ?case sorry
+next
+case (3 \<alpha> \<beta>)
+  then show ?case sorry
+qed auto
+
+
+lemma r_to_r: "Formula.sat \<sigma> V v i (rewrite \<alpha>) = Formula.sat \<sigma> V v i (rewriteo \<alpha>)" 
+  by(induct \<alpha> arbitrary: v rule: rewrite.induct;auto simp add: o_to_sat)
+
+lemma my_induct: "(\<And>\<alpha> \<beta> \<gamma>. P \<alpha> \<Longrightarrow> P \<beta> \<Longrightarrow> P \<gamma> \<Longrightarrow> P (formula.And \<alpha> (formula.Or \<beta> \<gamma>))) \<Longrightarrow>
+(\<And>\<alpha> \<beta>. P \<alpha> \<Longrightarrow> P \<beta> \<Longrightarrow> P (formula.Exists (rewrite (formula.And (Rewriting.shift \<alpha>) \<beta>)))) \<Longrightarrow>
+(\<And>\<alpha> \<beta>. P \<alpha> \<Longrightarrow> P \<beta> \<Longrightarrow> P (formula.And \<alpha> (formula.Neg \<beta>))) \<Longrightarrow> (\<And>\<alpha>. P \<alpha>) \<Longrightarrow> P x" by simp
+
+thm my_induct
+
+
 
 lemma rewrite_sat: "Formula.sat \<sigma> V v i (rewrite \<alpha>) = Formula.sat \<sigma> V v i \<alpha>"
-proof(induct \<alpha> arbitrary:  v rule: rewrite.induct)
-  case (1 f)
-  then show ?case   
-    apply (subst rewrite.simps shiftI.simps)
-    apply(simp only: Let_def sat.simps split: formula.splits if_splits )
-    apply(simp only: 1)
+  apply(simp only: r_to_r)
+  apply(induct \<alpha> arbitrary:  v rule: rewriteo.induct)
 
-    apply(simp only: sat.simps[symmetric])
-  apply(simp only: sat_rewrite_1 sat_rewrite_4[symmetric] sat_rewrite_5[symmetric])
-    sorry
-qed
-
+    apply (subst rewriteo.simps shiftI.simps)
+    apply(simp only: Let_def  split: formula.splits if_splits )
+    apply(simp only: sat_rewrite_1 sat_rewrite_4[symmetric] sat_rewrite_5[symmetric])
+  apply(auto)
+  sorry
+  
 definition "rr_num \<alpha> = length (sorted_list_of_set (rr 0 \<alpha>))"  
 
 lemma rr_num_g: "rr_num (rewrite \<alpha>) > rr_num \<alpha>" sorry
@@ -1137,7 +1214,7 @@ function full_rewrite :: "Formula.formula \<Rightarrow> Formula.formula" where
 by pat_completeness auto
 termination 
   
-  using rr_num_g by (relation "measure size")
+  using rr_num_g sorry
 
 (*
   apply (simp only: simp_thms formula.inject split_paired_All split formula.splits if_splits)
