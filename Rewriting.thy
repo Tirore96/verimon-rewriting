@@ -109,6 +109,65 @@ definition propagate_cond where
 | "tvars (F2i x) = tvars b x"
 | "tvars (I2f x) = tvars b x"*)
 
+(*fun tvars :: "Formula.trm \<Rightarrow> nat set" where
+  "tvars (Var x) = (if b \<le> x then {x} else {})"
+| "tvars (Const _) = {}"
+| "tvars (Plus x y) = tvars b x \<union> tvars b y"
+| "tvars (Minus x y) = tvars b x \<union> tvars b y"
+| "tvars (UMinus x) = tvars b x"
+| "tvars (Mult x y) = tvars b x \<union> tvars b y"
+| "tvars (Div x y) = tvars b x \<union> tvars b y"
+| "tvars (Mod x y) = tvars b x \<union> tvars b y"
+| "tvars (F2i x) = tvars b x"
+| "tvars (I2f x) = tvars b x"*)
+
+
+(*primrec rr_regex where
+  "rr_regex rr (Regex.Skip n) = {}"
+| "rr_regex rr (Regex.Test \<phi>) = rr \<phi>"
+| "rr_regex rr (Regex.Plus r s) = rr_regex rr r \<union> rr_regex rr s"
+| "rr_regex rr (Regex.Times r s) = rr_regex rr r \<union> rr_regex rr s"
+| "rr_regex rr (Regex.Star r) = rr_regex rr r"
+
+
+fun rr :: "nat \<Rightarrow> Formula.formula \<Rightarrow> nat set" where
+  "rr b (Formula.Pred r ts) = (\<Union>t\<in>set ts. Formula.fvi_trm b t)"
+| "rr b (Formula.Let p _ \<phi> \<psi>) = rr b \<psi>"
+| "rr  b(Formula.Eq t1 t2) = (case (t1,t2) of
+                             (Formula.Var x,Formula.Const _) \<Rightarrow> {x-b}
+                            |(Formula.Const _,Formula.Var x) \<Rightarrow> {x-b}
+                            | _ \<Rightarrow> {})"
+
+| "rr b (Formula.Less t1 t2) = (case (t1,t2) of
+                                              (Formula.Var x,Formula.Const _) \<Rightarrow> {x-b}
+                                             |_ \<Rightarrow> {})"
+| "rr b (Formula.LessEq t1 t2) = (case (t1,t2) of
+                                              (Formula.Var x,Formula.Const _) \<Rightarrow> {x-b}
+                                             |_ \<Rightarrow> {})"
+| "rr b (Formula.Or \<phi> \<psi>) = rr b \<phi> \<inter> rr b \<psi>"
+| "rr b (Formula.And \<phi> \<psi>) = rr b \<phi> \<union> rr b \<psi>"
+| "rr b (Formula.Ands \<phi>s) = (let xs = map (rr b) \<phi>s in \<Union>x\<in>set xs. x)"
+| "rr b (Formula.Exists \<phi>) = (if (0 \<in> rr 0 \<phi>) then rr (Suc b) \<phi>
+                                            else {})"
+| "rr b (Formula.Agg y \<omega> b' f \<phi>) = {}" (*How?*)
+| "rr b (Formula.Prev I \<phi>) = rr b \<phi>"
+| "rr b (Formula.Next I \<phi>) = rr b \<phi>"
+| "rr b (Formula.Since \<phi> I \<psi>) = rr b \<psi>"
+| "rr b (Formula.Until \<phi> I \<psi>) = rr b \<psi>"
+(*| "rr b (Formula.MatchF I r) = rr_regex (rr b) r"
+| "rr b (Formula.MatchP I r) = rr_regex (rr b) r"   Termination issues*)
+| "rr b (Formula.Neg \<beta>) = (case \<beta> of
+                            Formula.Until (Formula.Neg \<beta>) I (Formula.Neg \<gamma>) \<Rightarrow> rr b \<gamma>
+                           |Formula.Since (Formula.Neg \<beta>) I (Formula.Neg \<gamma>) \<Rightarrow> rr b \<gamma> )"  (*release and trigger cases*)
+| "rr b (formula.MatchF I r) = {}"
+| "rr b (formula.MatchP I r) = {}"
+
+definition "prop_cond f1 f2 =
+       (let rr1 = rr 0 f1;
+           rr2 = rr 0 f2; 
+           fv2 = Formula.fv f2 
+       in  (rr1 \<inter> (fv2-rr2)) \<noteq> {})"*)
+
 
 primrec rr_regex where
   "rr_regex rr (Regex.Skip n) = {}"
@@ -290,6 +349,50 @@ primrec shiftI :: "nat \<Rightarrow> rformula \<Rightarrow> rformula" where
 
 
 abbreviation shift where "shift \<equiv> shiftI 0"
+
+(*fun shiftTI :: "nat \<Rightarrow> Formula.trm \<Rightarrow> Formula.trm" where
+ "shiftTI k (Formula.Var i) = (if i < k then Formula.Var i 
+                                               else Formula.Var (i + 1))"
+| "shiftTI k (Formula.Plus t u) = Formula.Plus (shiftTI k t) (shiftTI k u)"
+| "shiftTI k (Formula.Minus t u) = Formula.Minus (shiftTI k t) (shiftTI k u)"
+| "shiftTI k (Formula.UMinus t) = Formula.UMinus (shiftTI k t)"
+| "shiftTI k (Formula.Mult t u) = Formula.Mult (shiftTI k t) (shiftTI k u)"
+| "shiftTI k (Formula.Div t u) = Formula.Div (shiftTI k t) (shiftTI k u)"
+| "shiftTI k (Formula.Mod t u) = Formula.Mod (shiftTI k t) (shiftTI k u)"
+| "shiftTI k (Formula.F2i t) = Formula.F2i (shiftTI k t)"
+| "shiftTI k (Formula.I2f t) = Formula.I2f (shiftTI k t)"
+| "shiftTI k (Formula.Const n) = (Formula.Const n)"
+
+lemma eval_trm_shiftTI: "length xs = b \<Longrightarrow>
+  Formula.eval_trm (xs @ z # v) (shiftTI b t) = Formula.eval_trm (xs @ v) t"
+  by (induct b t rule: shiftTI.induct) (auto simp: nth_append split: trm.splits)
+
+lemma shift_fv_in_t: "x+1 \<in> Formula.fvi_trm b (shiftTI b t) \<longleftrightarrow> x  \<in> Formula.fvi_trm b t" 
+   by (induction t;auto)
+
+primrec shiftI :: "nat \<Rightarrow> Formula.formula \<Rightarrow> Formula.formula" where
+  "shiftI k (Formula.Pred r ts) = Formula.Pred r (map (shiftTI k) ts)"
+| "shiftI k (Formula.Exists a) = Formula.Exists (shiftI (Suc k) a)"
+| "shiftI k (Formula.Let nm n a b) = Formula.Let nm n a (shiftI k b)" (*fixed error, a is not shifted*)
+| "shiftI k (Formula.Eq t1 t2) = Formula.Eq (shiftTI k t1) (shiftTI k t2)"
+| "shiftI k (Formula.Less t1 t2) =  Formula.Less (shiftTI k t1) (shiftTI k t2)"
+| "shiftI k (Formula.LessEq t1 t2) = Formula.LessEq (shiftTI k t1) (shiftTI k t2)"
+| "shiftI k (Formula.Neg a) = Formula.Neg (shiftI k a)"
+| "shiftI k (Formula.Or a b) = Formula.Or (shiftI k a) (shiftI k b)"
+| "shiftI k (Formula.And a b) = Formula.And (shiftI k a) (shiftI k b)"
+| "shiftI k (Formula.Ands as) = Formula.Ands (map (shiftI k) as)"  
+| "shiftI k (Formula.Agg y op b t a) = Formula.Agg (if y < k then y else y + 1)
+                                            op b (shiftTI (k + b) t) (shiftI (k + b) a)"
+| "shiftI k (Formula.Prev \<I> a) = Formula.Prev \<I> (shiftI k a)"
+| "shiftI k (Formula.Next \<I> a) = Formula.Next \<I> (shiftI k a)"
+| "shiftI k (Formula.Since a1 \<I> a2) = Formula.Since (shiftI k a1) \<I> (shiftI k a2)"
+| "shiftI k (Formula.Until a1 \<I> a2) = Formula.Until (shiftI k a1) \<I> (shiftI k a2)"
+| "shiftI k (Formula.MatchF \<I> r) = Formula.MatchF \<I> (Regex.map_regex (shiftI k) r)"
+| "shiftI k (Formula.MatchP \<I> r) = Formula.MatchP \<I> (Regex.map_regex (shiftI k) r)"
+
+
+abbreviation shift where "shift \<equiv> shiftI 0"*)
+
 
 lemma shift_fv_in_f: "(x+1) \<in> (Formula.fvi b (shiftI b \<phi>)) \<longleftrightarrow> x \<in> (Formula.fvi b \<phi>)"
 using shift_fv_in_t proof (induction b \<phi> rule: fvi.induct)
@@ -1221,6 +1324,11 @@ lemma subst_rsat3: "rsat \<sigma> V v i \<alpha> = rsat \<sigma> V v i \<alpha>'
 abbreviation finite_int where "finite_int I \<equiv> (right I) \<noteq> \<infinity>"
 
 
+datatype argpos = Same | Swapped
+
+fun size_argpos :: "argpos \<Rightarrow> nat"where
+"size_argpos Same = 1"
+| "size_argpos Swapped = 0"
 
 primrec my_size :: "rformula \<Rightarrow> nat" where
   "my_size (RPred r ts) = 1"
@@ -1253,161 +1361,384 @@ lemma shift_size: "my_size (shift \<alpha>) = my_size \<alpha>" sorry
 
 lemma not_zero: "my_size \<alpha> > 0" by (induction \<alpha>;auto)
 
-datatype tries = First | Second
 
-definition size_tries where
-"size_tries t = (case t of First \<Rightarrow> 2 | Second \<Rightarrow> 1)"
 
-function rewrite :: "rformula \<Rightarrow> tries \<Rightarrow> rformula" where
-(*1*)  "rewrite f t = (case f of
-                        (RAnd \<alpha> (ROr \<beta> \<gamma>)) \<Rightarrow>
+
+
+(*lemma partition_cong[fundef_cong]:
+  "xs = ys \<Longrightarrow> (\<And>x. x\<in>set xs \<Longrightarrow> f x = g x) \<Longrightarrow> partition f xs = partition g ys"
+  by (induction xs arbitrary: ys) auto*)
+
+lemma rewrite1_conj[fundef_cong]: "(\<And>x. f x = g x) \<Longrightarrow> rewrite1 f \<alpha> = rewrite1 g \<alpha>" by presburger
+
+lemma project_cong[fundef_cong]: "f1 = f2 \<Longrightarrow> project f1 = project f2" by auto
+
+lemma sat_rewrite1: "(\<And>f. rsat \<sigma> V v i (re_fun f) = rsat \<sigma> V v i f) \<Longrightarrow>  
+                         rsat \<sigma> V v i (rewrite1 re_fun f2) = rsat \<sigma> V v i f2"
+proof(induction re_fun f2 rule:rewrite1.induct)
+  case (1 re_fun \<alpha> \<beta> \<gamma>)
+  then show ?case 
+  proof(cases "(prop_cond \<alpha> \<beta> \<or> prop_cond \<alpha> \<gamma>)")
+    case True
+    then show ?thesis 
+      apply(subst rewrite1.simps)
+      apply(simp only: project.simps Let_def split:if_splits)
+      apply(simp)
+     (* apply(simp only: 1[of "(formula.And \<alpha> \<beta>)"] 1[of "(formula.And \<alpha> \<gamma>)"])*)
+      apply auto
+      sorry
+  next
+    case False
+    then show ?thesis 
+      apply(subst rewrite1.simps)
+      apply(simp add: 1[of \<alpha>] 1[of \<beta>] 1[of \<gamma>]  split:if_splits)
+      sorry
+  qed
+qed auto
+
+
+fun rewrite4 :: "(rformula \<Rightarrow> rformula) \<Rightarrow> rformula \<Rightarrow> rformula \<Rightarrow> rformula" where
+(*1*) "rewrite4 re_fun  \<alpha> (RExists \<beta>) = 
+       (if prop_cond \<alpha> \<beta>  
+        then RExists (re_fun (RAnd (shift \<alpha>) \<beta>))
+        else let \<alpha>' = re_fun \<alpha>; \<beta>' = re_fun \<beta> in RAnd \<alpha>' (RExists \<beta>'))"
+|      "rewrite4 re_fun \<alpha> f = RAnd \<alpha> f"
+
+lemma sat_r4: "(\<And>f v. rsat \<sigma> V v i (re_fun f) = rsat \<sigma> V v i f) \<Longrightarrow>  
+                         rsat \<sigma> V v i (rewrite4 re_fun f2 f3) = rsat \<sigma> V v i f2" sorry
+(*proof(induction re_fun f2 arbitrary: v rule:rewrite1.induct)
+  case (1 re_fun \<alpha> \<beta> \<gamma>)
+  then show ?case 
+  proof(cases "(prop_cond \<alpha> \<beta> \<or> prop_cond \<alpha> \<gamma>)")
+    case True
+    then show ?thesis sorry
+      (*apply(subst rewrite1.simps)
+      apply(simp add: 1[of "(formula.And \<alpha> \<beta>)"] 1[of "(formula.And \<alpha> \<gamma>)"]  split:if_splits)
+      apply auto
+      done*)
+  next
+    case False
+    then show ?thesis  sorry
+    (*  apply(subst rewrite1.simps)
+      apply(simp add: 1[of \<alpha>] 1[of \<beta>] 1[of \<gamma>]  split:if_splits)
+      done*)
+  qed
+next 
+  show ?thesis
+*)
+  
+
+(*function(sequential) rewrite :: "rformula \<Rightarrow> rformula" where
+"rewrite (RAnd f1 f2) = (let f' = (rewrite4 rewrite f1 f2) in if f' = RAnd f1 f2 then rewrite4 rewrite f2 f1 else f')"
+(*(*6,8*)| "rewrite (RSince l I r) = (
+             case (l,r) of
+              (RAnd \<alpha> \<gamma>,\<beta>) \<Rightarrow> (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I)
+                               then RSince (rewrite (RAnd \<alpha> \<gamma>)) I (rewrite (RAnd (RDiamondW I \<alpha>) \<beta>))
+                               else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in RSince (RAnd \<alpha>' \<gamma>') I \<beta>')
+             | (\<beta>,RAnd \<alpha> \<gamma>) \<Rightarrow> (if (prop_cond \<alpha> \<beta>)
+                                then RSince (rewrite (RAnd (RDiamondB I \<alpha>) \<beta>)) I (rewrite (RAnd \<alpha> \<gamma>))
+                                else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in RSince \<beta>' I (RAnd \<alpha>' \<gamma>'))
+             | _ \<Rightarrow> let l' = rewrite l; r' = rewrite r in RSince l' I r')"
+(*7,9*) | "rewrite (RUntil l I r) = (
+             case (l,r) of
+              (RAnd \<alpha> \<gamma>,\<beta>) \<Rightarrow>  (if (prop_cond \<alpha> \<beta>)
+                                then RUntil (rewrite (RAnd \<alpha> \<gamma>)) I (rewrite (RAnd (RDiamondB I \<alpha>) \<beta>))
+                                else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in RUntil (RAnd \<alpha>' \<gamma>') I \<beta>')
+             | (\<beta>,RAnd \<alpha> \<gamma>) \<Rightarrow> (if (prop_cond \<alpha> \<beta>)
+                                then RUntil (rewrite (RAnd (RDiamondW I \<alpha>) \<beta>)) I (rewrite (RAnd \<alpha> \<gamma>))
+                                else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in RUntil \<beta>' I (RAnd \<alpha>' \<gamma>'))
+             | _ \<Rightarrow> let l' = rewrite l; r' = rewrite r in RSince l' I r')"*)
+| "rewrite f = f"
+  by pat_completeness auto
+termination*)
+(*  case (1 \<alpha> \<beta> \<gamma>)
+  have con:"f_conr2 (\<lambda>f1 f2. ROr f1 f2)" by (rule f_conr2_1_t) 
+  from 1 show ?case 
+  proof(cases "prop_cond \<alpha> \<beta>")
+    case True
+    then show ?thesis 
+      apply(subst rewriteC.simps)
+    apply(simp only: Let_def simp_thms(7,15,16)  split:if_splits)
+    apply(simp only: subst_rsat2[OF con 1(1-2)[OF True]] )
+    apply(simp only: sat_rewriteC_1_e[symmetric])
+    done
+  next
+    case False
+    have con:"f_conr3 (\<lambda>f1 f2 f3. RAnd f1 (ROr f2 f3))" by (rule f_conr3_1_l)
+    from False show ?thesis 
+      apply(subst rewriteC.simps)
+      apply(simp only: Let_def simp_thms(8,15,16)  split:if_splits)
+      apply(simp only: subst_rsat3[OF con 1(3)[OF False] 1(4)[OF False refl] 1(5)[OF False refl refl]] )
+      done
+  qed*)
+
+
+(*function(sequential) rewrite where
+(*1*)  "rewrite (RAnd \<alpha> (ROr \<beta> \<gamma>)) =
        (if prop_cond \<alpha> \<beta> \<and> prop_cond \<alpha> \<gamma>
-       then ROr (rewrite (RAnd \<alpha> \<beta>) First) (rewrite (RAnd \<alpha> \<gamma>) First)
-       else let \<alpha>' = rewrite \<alpha> First; \<beta>' = rewrite \<beta> First;  \<gamma>' = rewrite \<gamma> First in RAnd \<alpha>' (ROr \<beta>' \<gamma>')))"
-|
-(*1*)  "rewrite (RAnd \<alpha> (ROr \<beta> \<gamma>)) t =
-       (if prop_cond \<alpha> \<beta> \<and> prop_cond \<alpha> \<gamma>
-       then ROr (rewrite (RAnd \<alpha> \<beta>) First) (rewrite (RAnd \<alpha> \<gamma>) First)
-       else let \<alpha>' = rewrite \<alpha> First; \<beta>' = rewrite \<beta> First;  \<gamma>' = rewrite \<gamma> First in RAnd \<alpha>' (ROr \<beta>' \<gamma>'))" (*added prop_cond gamma because the rewrite shouldn't be position dependent*)
+       then ROr (rewrite (RAnd \<alpha> \<beta>) ) (rewrite (RAnd \<alpha> \<gamma>) )
+       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta> ;  \<gamma>' = rewrite \<gamma>  in RAnd \<alpha>' (ROr \<beta>' \<gamma>'))" (*added prop_cond gamma because the rewrite shouldn't be position dependent*)
 (*(*1_2*)| "rewriteC (ROr \<beta> \<gamma>) \<alpha> =
        (if prop_cond \<alpha> \<beta> \<and> prop_cond \<alpha> \<gamma>
        then ROr (rewrite (RAnd \<alpha> \<beta>)) (rewrite (RAnd \<alpha> \<gamma>))
        else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in RAnd \<alpha>' (ROr \<beta>' \<gamma>'))"*)
-(*(*2*) | "rewrite (RAnd \<alpha> (RRelease \<beta> I \<gamma>)) t =
+(*(*2*) | "rewrite (RAnd \<alpha> (RRelease \<beta> I \<gamma>)) =
       (if prop_cond \<alpha> \<beta>
-       then RAnd (rewrite \<alpha> First) (RRelease (rewrite (RAnd \<beta> (RDiamondB (init_int I) \<alpha>)) First) I (rewrite (RAnd \<gamma> (RDiamondB I \<alpha>)) First))
-       else let \<alpha>' = rewrite \<alpha> First; \<beta>' = rewrite \<beta> First;  \<gamma>' = rewrite \<gamma> First in (RAnd \<alpha>' (RRelease \<beta>' I \<gamma>')))"
+       then RAnd (rewrite \<alpha> ) (RRelease (rewrite (RAnd \<beta> (RDiamondB (init_int I) \<alpha>)) ) I (rewrite (RAnd \<gamma> (RDiamondB I \<alpha>)) ))
+       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta> ;  \<gamma>' = rewrite \<gamma>  in (RAnd \<alpha>' (RRelease \<beta>' I \<gamma>')))"
 (*2_2*) | "rewriteC (RRelease \<beta> I \<gamma>) \<alpha> =
       (if prop_cond \<alpha> \<beta>
        then RAnd (rewrite \<alpha>) (RRelease (rewrite (RAnd \<beta> (RDiamondB (init_int I) \<alpha>))) I (rewrite (RAnd \<gamma> (RDiamondB I \<alpha>))))
        else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in (RAnd \<alpha>' (RRelease \<beta>' I \<gamma>')))"*)
-(*3*) | "rewrite (RAnd \<alpha> (RTrigger \<beta> I \<gamma>)) t =
+(*3*) | "rewrite (RAnd \<alpha> (RTrigger \<beta> I \<gamma>)) =
       (if prop_cond \<alpha> \<beta>
-       then RAnd (rewrite \<alpha> First) (RTrigger (rewrite (RAnd \<beta> (RDiamondW (init_int I) \<alpha>)) First) I (rewrite (RAnd \<gamma> (RDiamondW I \<alpha>)) First))
-       else let \<alpha>' = rewrite \<alpha> First; \<beta>' = rewrite \<beta> First;  \<gamma>' = rewrite \<gamma> First in (RAnd \<alpha>' (RTrigger \<beta>' I \<gamma>')))"
+       then RAnd (rewrite \<alpha> ) (RTrigger (rewrite (RAnd \<beta> (RDiamondW (init_int I) \<alpha>)) ) I (rewrite (RAnd \<gamma> (RDiamondW I \<alpha>)) ))
+       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta> ;  \<gamma>' = rewrite \<gamma>  in (RAnd \<alpha>' (RTrigger \<beta>' I \<gamma>')))"
   (*(*3_2*) | "rewrite (RAnd (RTrigger \<beta> I \<gamma>) \<alpha>) =
       (if prop_cond \<alpha> \<beta>
        then RAnd (rewrite \<alpha>) (RTrigger (rewrite (RAnd \<beta> (RDiamondW (init_int I) \<alpha>))) I (rewrite (RAnd \<gamma> (RDiamondW I \<alpha>))))
        else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in (RAnd \<alpha>' (RTrigger \<beta>' I \<gamma>')))"*)
-(*4*) | "rewrite (RAnd \<alpha> (RExists \<beta>)) t = 
+(*4*) | "rewrite (RAnd \<alpha> (RExists \<beta>)) = 
        (if prop_cond \<alpha> \<beta>  
-        then RExists (rewrite (RAnd (shift \<alpha>) \<beta>) First)
-        else let \<alpha>' = rewrite \<alpha> First; \<beta>' = rewrite \<beta> First in RAnd \<alpha>' (RExists \<beta>'))"
+        then RExists (rewrite (RAnd (shift \<alpha>) \<beta>) )
+        else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta>  in RAnd \<alpha>' (RExists \<beta>'))"
 (*(*4_2*) | "rewrite (RAnd (RExists \<beta>) \<alpha>) = 
        (if prop_cond \<alpha> \<beta>  
         then RExists (rewrite (RAnd (shift \<alpha>) \<beta>))
         else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in RAnd \<alpha>' (RExists \<beta>'))"*)
-(*5*) | "rewrite (RAnd \<alpha> (RNeg \<beta>)) t =
+(*5*) | "rewrite (RAnd \<alpha> (RNeg \<beta>)) =
       (if prop_cond \<alpha> \<beta>  
-       then RAnd (rewrite \<alpha> First) ((RNeg (rewrite (RAnd \<alpha> \<beta>) First)))  
-       else let \<alpha>' = rewrite \<alpha> First; \<beta>' = rewrite \<beta> First in RAnd \<alpha>' (RNeg \<beta>'))"
+       then RAnd (rewrite \<alpha> ) ((RNeg (rewrite (RAnd \<alpha> \<beta>) )))  
+       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta>  in RAnd \<alpha>' (RNeg \<beta>'))"
 (*(*5_2*) | "rewrite (RAnd (RNeg \<beta>) \<alpha>) =
       (if prop_cond \<alpha> \<beta>  
        then RAnd (rewrite \<alpha>) ((RNeg (rewrite (RAnd \<alpha> \<beta>))))  
        else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in RAnd \<alpha>' (RNeg \<beta>'))"*)
-(*10,12*) | "rewrite (RAnd \<alpha> (RSince \<beta> I \<gamma>)) t =
-      (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I) then RAnd (rewrite \<alpha> First) (RSince (rewrite (RAnd (RDiamondW (init_int I) \<alpha>) \<beta>) First) I (rewrite \<gamma> First))
-       else if (prop_cond \<alpha> \<gamma>) \<and> (finite_int I) then RAnd (rewrite \<alpha> First) (RSince (rewrite \<beta> First) I (rewrite (RAnd (RDiamondW I \<alpha>) \<gamma>) First))
-       else let \<alpha>' = rewrite \<alpha> First; \<beta>' = rewrite \<beta> First;  \<gamma>' = rewrite \<gamma> First in RAnd \<alpha>' (RSince \<beta>' I \<gamma>'))"
+(*10,12*) | "rewrite (RAnd \<alpha> (RSince \<beta> I \<gamma>)) =
+      (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I) then RAnd (rewrite \<alpha> ) (RSince (rewrite (RAnd (RDiamondW (init_int I) \<alpha>) \<beta>) ) I (rewrite \<gamma> ))
+       else if (prop_cond \<alpha> \<gamma>) \<and> (finite_int I) then RAnd (rewrite \<alpha> ) (RSince (rewrite \<beta> ) I (rewrite (RAnd (RDiamondW I \<alpha>) \<gamma>) ))
+       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta> ;  \<gamma>' = rewrite \<gamma>  in RAnd \<alpha>' (RSince \<beta>' I \<gamma>'))"
 (*(*10_2,12_2*) | "rewrite (RAnd (RSince \<beta> I \<gamma>) \<alpha>) =
       (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I) then RAnd (rewrite \<alpha>) (RSince (rewrite (RAnd (RDiamondW (init_int I) \<alpha>) \<beta>)) I (rewrite \<gamma>))
        else if (prop_cond \<alpha> \<gamma>) \<and> (finite_int I) then RAnd (rewrite \<alpha>) (RSince (rewrite \<beta>) I (rewrite (RAnd (RDiamondW I \<alpha>) \<gamma>)))
        else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in RAnd \<alpha>' (RSince \<beta>' I \<gamma>'))"*)
-(*11,13*) | "rewrite (RAnd \<alpha> (RUntil \<beta> I \<gamma>)) t =
-      (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I) then RAnd (rewrite \<alpha> First) (RUntil (rewrite (RAnd (RDiamondB (init_int I) \<alpha>) \<beta>) First) I (rewrite \<gamma> First))
-       else if (prop_cond \<alpha> \<gamma>) \<and> (finite_int I) then RAnd (rewrite \<alpha> First) (RUntil (rewrite \<beta> First) I (rewrite (RAnd (RDiamondB I \<alpha>) \<gamma>) First))
-       else let \<alpha>' = rewrite \<alpha> First; \<beta>' = rewrite \<beta> First;  \<gamma>' = rewrite \<gamma> First in RAnd \<alpha>' (RUntil \<beta>' I \<gamma>'))"
+(*11,13*) | "rewrite (RAnd \<alpha> (RUntil \<beta> I \<gamma>)) =
+      (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I) then RAnd (rewrite \<alpha> ) (RUntil (rewrite (RAnd (RDiamondB (init_int I) \<alpha>) \<beta>) ) I (rewrite \<gamma> ))
+       else if (prop_cond \<alpha> \<gamma>) \<and> (finite_int I) then RAnd (rewrite \<alpha> ) (RUntil (rewrite \<beta> ) I (rewrite (RAnd (RDiamondB I \<alpha>) \<gamma>) ))
+       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta> ;  \<gamma>' = rewrite \<gamma>  in RAnd \<alpha>' (RUntil \<beta>' I \<gamma>'))"
 (*(*11_2,13_2*) | "rewrite (RAnd (RUntil \<beta> I \<gamma>) \<alpha>) =
       (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I) then RAnd (rewrite \<alpha>) (RUntil (rewrite (RAnd (RDiamondB (init_int I) \<alpha>) \<beta>)) I (rewrite \<gamma>))
        else if (prop_cond \<alpha> \<gamma>) \<and> (finite_int I) then RAnd (rewrite \<alpha>) (RUntil (rewrite \<beta>) I (rewrite (RAnd (RDiamondB I \<alpha>) \<gamma>)))
        else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in RAnd \<alpha>' (RUntil \<beta>' I \<gamma>'))"*)
-(*18*) | "rewrite (RAnd \<alpha> (RDiamondB I \<beta>)) t =
+(*18*) | "rewrite (RAnd \<alpha> (RDiamondB I \<beta>)) =
       (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I)
-       then RAnd (rewrite \<alpha> First) (RDiamondB I (RAnd (RDiamondW I (rewrite \<alpha> First)) (rewrite \<beta> First)))
-       else let \<alpha>' = rewrite \<alpha> First; \<beta>' = rewrite \<beta> First in RAnd \<alpha>' (RDiamondB I \<beta>'))"
+       then RAnd (rewrite \<alpha> ) (RDiamondB I (RAnd (RDiamondW I (rewrite \<alpha> )) (rewrite \<beta> )))
+       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta>  in RAnd \<alpha>' (RDiamondB I \<beta>'))"
 (*(*18_2*) | "rewrite (RAnd (RDiamondB I \<beta>) \<alpha>) =
       (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I)
        then RAnd (rewrite \<alpha>) (RDiamondB I (RAnd (RDiamondW I (rewrite \<alpha>)) (rewrite \<beta>)))
        else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in RAnd \<alpha>' (RDiamondB I \<beta>'))"*)
-(*19*) | "rewrite (RAnd \<alpha> (RDiamondW I \<beta>)) t =
+(*19*) | "rewrite (RAnd \<alpha> (RDiamondW I \<beta>)) =
       (if (prop_cond \<alpha> \<beta>)
-       then RAnd (rewrite \<alpha> First) (RDiamondW I (RAnd (RDiamondB I (rewrite \<alpha> First)) (rewrite \<beta> First)))
-       else let \<alpha>' = rewrite \<alpha> First; \<beta>' = rewrite \<beta> First in RAnd \<alpha>' (RDiamondW I \<beta>'))"
+       then RAnd (rewrite \<alpha> ) (RDiamondW I (RAnd (RDiamondB I (rewrite \<alpha> )) (rewrite \<beta> )))
+       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta>  in RAnd \<alpha>' (RDiamondW I \<beta>'))"
 (*(*19_2*) | "rewrite (RAnd (RDiamondW I \<beta>) \<alpha>) =
       (if (prop_cond \<alpha> \<beta>)
        then RAnd (rewrite \<alpha>) (RDiamondW I (RAnd (RDiamondB I (rewrite \<alpha>)) (rewrite \<beta>)))
        else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in RAnd \<alpha>' (RDiamondW I \<beta>'))"*)
- (*20*) | "rewrite (RAnd \<alpha> (RSquareB I \<beta>)) t =
+ (*20*) | "rewrite (RAnd \<alpha> (RSquareB I \<beta>)) =
       (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I)
-       then RAnd (rewrite \<alpha> First) (RSquareB I (RAnd (RDiamondW I (rewrite \<alpha> First)) (rewrite \<beta> First)))
-       else let \<alpha>' = rewrite \<alpha> First; \<beta>' = rewrite \<beta> First in RAnd \<alpha>' (RSquareB I \<beta>'))" (*some of these rules don't rewrite the conjunction, of diamond/square, because it doesn't increase rr of the conjunction more than recursing the leaves*)
+       then RAnd (rewrite \<alpha> ) (RSquareB I (RAnd (RDiamondW I (rewrite \<alpha> )) (rewrite \<beta> )))
+       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta>  in RAnd \<alpha>' (RSquareB I \<beta>'))" (*some of these rules don't rewrite the conjunction, of diamond/square, because it doesn't increase rr of the conjunction more than recursing the leaves*)
 (*(*20_2*) | "rewrite (RAnd (RSquareB I \<beta>) \<alpha>) =
       (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I)
        then RAnd (rewrite \<alpha>) (RSquareB I (RAnd (RDiamondW I (rewrite \<alpha>)) (rewrite \<beta>)))
        else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in RAnd \<alpha>' (RSquareB I \<beta>'))"*)
- (*21*) | "rewrite (RAnd \<alpha> (RSquareW I \<beta>)) t =
+ (*21*) | "rewrite (RAnd \<alpha> (RSquareW I \<beta>)) =
       (if (prop_cond \<alpha> \<beta>)
-       then RAnd (rewrite \<alpha> First) (RSquareW I (RAnd (RDiamondB I (rewrite \<alpha> First)) (rewrite \<beta> First)))
-       else let \<alpha>' = rewrite \<alpha> First; \<beta>' = rewrite \<beta> First in RAnd \<alpha>' (RSquareW I \<beta>'))"
+       then RAnd (rewrite \<alpha> ) (RSquareW I (RAnd (RDiamondB I (rewrite \<alpha> )) (rewrite \<beta> )))
+       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta>  in RAnd \<alpha>' (RSquareW I \<beta>'))"
 (* (*21_2*) | "rewrite (RAnd (RSquareW I \<beta>) \<alpha>) =
       (if (prop_cond \<alpha> \<beta>)
        then RAnd (rewrite \<alpha>) (RSquareW I (RAnd (RDiamondB I (rewrite \<alpha>)) (rewrite \<beta>)))
        else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in RAnd \<alpha>' (RSquareW I \<beta>'))"*)
- (*22*) | "rewrite (RAnd \<alpha> (RPrev I \<beta>)) t =
+ (*22*) | "rewrite (RAnd \<alpha> (RPrev I \<beta>)) =
       (if (prop_cond \<alpha> \<beta>)
-       then RAnd (rewrite \<alpha> First) (RPrev I (RAnd (RNext I (rewrite \<alpha> First)) (rewrite \<beta> First)))
-       else let \<alpha>' = rewrite \<alpha> First; \<beta>' = rewrite \<beta> First in RAnd \<alpha>' (RPrev I \<beta>'))"
+       then RAnd (rewrite \<alpha> ) (RPrev I (RAnd (RNext I (rewrite \<alpha> )) (rewrite \<beta> )))
+       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta>  in RAnd \<alpha>' (RPrev I \<beta>'))"
 (*(*22_2*) | "rewrite (RAnd (RPrev I \<beta>) \<alpha>) =
       (if (prop_cond \<alpha> \<beta>)
        then RAnd (rewrite \<alpha>) (RPrev I (RAnd (RNext I (rewrite \<alpha>)) (rewrite \<beta>)))
        else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in RAnd \<alpha>' (RPrev I \<beta>'))"*)
-(*23*) | "rewrite (RAnd \<alpha> (RNext I \<beta>)) t =
+(*23*) | "rewrite (RAnd \<alpha> (RNext I \<beta>)) =
       (if (prop_cond \<alpha> \<beta>)
-       then RAnd (rewrite \<alpha> First) (RNext I (RAnd (RPrev I (rewrite \<alpha> First)) (rewrite \<beta> First)))
-       else let \<alpha>' = rewrite \<alpha> First; \<beta>' = rewrite \<beta> First in (RAnd \<alpha>' (RNext I \<beta>')))"
+       then RAnd (rewrite \<alpha> ) (RNext I (RAnd (RPrev I (rewrite \<alpha> )) (rewrite \<beta> )))
+       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta>  in (RAnd \<alpha>' (RNext I \<beta>')))"
 (*(*23_2*) | "rewrite (RAnd (RNext I \<beta>) \<alpha>) =
       (if (prop_cond \<alpha> \<beta>)
        then RAnd (rewrite \<alpha>) (RNext I (RAnd (RPrev I (rewrite \<alpha>)) (rewrite \<beta>)))
        else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in (RAnd \<alpha>' (RNext I \<beta>')))"*)
 
-(*6,8*)| "rewrite (RSince l I r) t = (
-             case (l,r) of
-              (RAnd \<alpha> \<gamma>,\<beta>) \<Rightarrow> (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I)
-                               then RSince (rewrite (RAnd \<alpha> \<gamma>) First) I (rewrite (RAnd (RDiamondW I \<alpha>) \<beta>) First)
-                               else let \<alpha>' = rewrite \<alpha> First; \<beta>' = rewrite \<beta> First;  \<gamma>' = rewrite \<gamma> First in RSince (RAnd \<alpha>' \<gamma>') I \<beta>')
-             | (\<beta>,RAnd \<alpha> \<gamma>) \<Rightarrow> (if (prop_cond \<alpha> \<beta>)
-                                then RSince (rewrite (RAnd (RDiamondB I \<alpha>) \<beta>) First) I (rewrite (RAnd \<alpha> \<gamma>) First)
-                                else let \<alpha>' = rewrite \<alpha> First; \<beta>' = rewrite \<beta> First;  \<gamma>' = rewrite \<gamma> First in RSince \<beta>' I (RAnd \<alpha>' \<gamma>'))
-             | _ \<Rightarrow> let l' = rewrite l First; r' = rewrite r First in RSince l' I r')"
-(*7,9*) | "rewrite (RUntil l I r) t = (
-             case (l,r) of
-              (RAnd \<alpha> \<gamma>,\<beta>) \<Rightarrow>  (if (prop_cond \<alpha> \<beta>)
-                                then RUntil (rewrite (RAnd \<alpha> \<gamma>) First) I (rewrite (RAnd (RDiamondB I \<alpha>) \<beta>) First)
-                                else let \<alpha>' = rewrite \<alpha> First; \<beta>' = rewrite \<beta> First;  \<gamma>' = rewrite \<gamma> First in RUntil (RAnd \<alpha>' \<gamma>') I \<beta>')
-             | (\<beta>,RAnd \<alpha> \<gamma>) \<Rightarrow> (if (prop_cond \<alpha> \<beta>)
-                                then RUntil (rewrite (RAnd (RDiamondW I \<alpha>) \<beta>) First) I (rewrite (RAnd \<alpha> \<gamma>) First)
-                                else let \<alpha>' = rewrite \<alpha> First; \<beta>' = rewrite \<beta> First;  \<gamma>' = rewrite \<gamma> First in RUntil \<beta>' I (RAnd \<alpha>' \<gamma>'))
-             | _ \<Rightarrow> let l' = rewrite l First; r' = rewrite r First in RSince l' I r')"
-| "rewrite (RAnd f1 f2) First = rewrite (RAnd f2 f1) Second"
-| "rewrite (RAnd f1 f2) S)cond = RAnd f1 f2"
+(*6,8*)| "rewrite (RSince (RAnd \<alpha> \<gamma>) I \<beta>) =  (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I)
+                               then RSince (rewrite (RAnd \<alpha> \<gamma>) ) I (rewrite (RAnd (RDiamondW I \<alpha>) \<beta>) )
+                               else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta> ;  \<gamma>' = rewrite \<gamma>  in RSince (RAnd \<alpha>' \<gamma>') I \<beta>')"
+(*|"rewrite (RSince \<beta> I (RAnd \<alpha> \<gamma>)) = (if (prop_cond \<alpha> \<beta>)
+                                then RSince (rewrite (RAnd (RDiamondB I \<alpha>) \<beta>) ) I (rewrite (RAnd \<alpha> \<gamma>) )
+                                else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta> ;  \<gamma>' = rewrite \<gamma>  in RSince \<beta>' I (RAnd \<alpha>' \<gamma>'))"*)
 
-| "rewrite f t = f"
+(*(*7,9*) | "rewrite (RUntil (RAnd \<alpha> \<gamma>) I \<beta>) = (if (prop_cond \<alpha> \<beta>)
+                                then RUntil (rewrite (RAnd \<alpha> \<gamma>) ) I (rewrite (RAnd (RDiamondB I \<alpha>) \<beta>) )
+                                else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta> ;  \<gamma>' = rewrite \<gamma>  in RUntil (RAnd \<alpha>' \<gamma>') I \<beta>')"
+| "rewrite (RUntil \<beta> I (RAnd \<alpha> \<gamma>)) =(if (prop_cond \<alpha> \<beta>)
+                                then RUntil (rewrite (RAnd (RDiamondW I \<alpha>) \<beta>) ) I (rewrite (RAnd \<alpha> \<gamma>) )
+                                else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta> ;  \<gamma>' = rewrite \<gamma>  in RUntil \<beta>' I (RAnd \<alpha>' \<gamma>'))"*)
+
+| "rewrite f = f"
 
   by pat_completeness auto
 termination 
   apply(relation "measure (\<lambda>f t. (my_size f) + (size_tries t)")
   apply (auto simp add: shift_size not_zero) (*not_zero important because size of constructor then depends on its' number of arguments*)
   done
-lemma size_r: "\<And>r::rformula. m r > 0" sorry
+lemma size_r: "\<And>r::rformula. m r > 0" sorry*)
 
 
 
-  by pat_completeness auto
+(*  by pat_completeness auto
 termination 
   apply(relation "measure my_size")
   apply (auto simp add: shift_size not_zero) (*not_zero important because size of constructor then depends on its' number of arguments*)
   done
-lemma size_r: "\<And>r::rformula. m r > 0" sorry
+lemma size_r: "\<And>r::rformula. m r > 0" sorry*)
+
+function(sequential) rewrite where
+(*1*)  "rewrite (RAnd \<alpha> (ROr \<beta> \<gamma>)) t =
+       (if prop_cond \<alpha> \<beta> \<and> prop_cond \<alpha> \<gamma>
+       then ROr (rewrite (RAnd \<alpha> \<beta>) Same) (rewrite (RAnd \<alpha> \<gamma>) Same)
+       else let \<alpha>' = rewrite \<alpha> Same; \<beta>' = rewrite \<beta> Same;  \<gamma>' = rewrite \<gamma> Same in RAnd \<alpha>' (ROr \<beta>' \<gamma>'))" (*added prop_cond gamma because the rewrite shouldn't be position dependent*)
+(*(*1_2*)| "rewriteC (ROr \<beta> \<gamma>) \<alpha> =
+       (if prop_cond \<alpha> \<beta> \<and> prop_cond \<alpha> \<gamma>
+       then ROr (rewrite (RAnd \<alpha> \<beta>)) (rewrite (RAnd \<alpha> \<gamma>))
+       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in RAnd \<alpha>' (ROr \<beta>' \<gamma>'))"*)
+(*(*2*) | "rewrite (RAnd \<alpha> (RRelease \<beta> I \<gamma>)) t =
+      (if prop_cond \<alpha> \<beta>
+       then RAnd (rewrite \<alpha> Same) (RRelease (rewrite (RAnd \<beta> (RDiamondB (init_int I) \<alpha>)) Same) I (rewrite (RAnd \<gamma> (RDiamondB I \<alpha>)) Same))
+       else let \<alpha>' = rewrite \<alpha> Same; \<beta>' = rewrite \<beta> Same;  \<gamma>' = rewrite \<gamma> Same in (RAnd \<alpha>' (RRelease \<beta>' I \<gamma>')))"
+(*2_2*) | "rewriteC (RRelease \<beta> I \<gamma>) \<alpha> =
+      (if prop_cond \<alpha> \<beta>
+       then RAnd (rewrite \<alpha>) (RRelease (rewrite (RAnd \<beta> (RDiamondB (init_int I) \<alpha>))) I (rewrite (RAnd \<gamma> (RDiamondB I \<alpha>))))
+       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in (RAnd \<alpha>' (RRelease \<beta>' I \<gamma>')))"*)
+(*3*) | "rewrite (RAnd \<alpha> (RTrigger \<beta> I \<gamma>)) t =
+      (if prop_cond \<alpha> \<beta>
+       then RAnd (rewrite \<alpha> Same) (RTrigger (rewrite (RAnd \<beta> (RDiamondW (init_int I) \<alpha>)) Same) I (rewrite (RAnd \<gamma> (RDiamondW I \<alpha>)) Same))
+       else let \<alpha>' = rewrite \<alpha> Same; \<beta>' = rewrite \<beta> Same;  \<gamma>' = rewrite \<gamma> Same in (RAnd \<alpha>' (RTrigger \<beta>' I \<gamma>')))"
+  (*(*3_2*) | "rewrite (RAnd (RTrigger \<beta> I \<gamma>) \<alpha>) =
+      (if prop_cond \<alpha> \<beta>
+       then RAnd (rewrite \<alpha>) (RTrigger (rewrite (RAnd \<beta> (RDiamondW (init_int I) \<alpha>))) I (rewrite (RAnd \<gamma> (RDiamondW I \<alpha>))))
+       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in (RAnd \<alpha>' (RTrigger \<beta>' I \<gamma>')))"*)
+(*4*) | "rewrite (RAnd \<alpha> (RExists \<beta>)) t = 
+       (if prop_cond \<alpha> \<beta>  
+        then RExists (rewrite (RAnd (shift \<alpha>) \<beta>) Same)
+        else let \<alpha>' = rewrite \<alpha> Same; \<beta>' = rewrite \<beta> Same in RAnd \<alpha>' (RExists \<beta>'))"
+(*(*4_2*) | "rewrite (RAnd (RExists \<beta>) \<alpha>) = 
+       (if prop_cond \<alpha> \<beta>  
+        then RExists (rewrite (RAnd (shift \<alpha>) \<beta>))
+        else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in RAnd \<alpha>' (RExists \<beta>'))"*)
+(*5*) | "rewrite (RAnd \<alpha> (RNeg \<beta>)) t =
+      (if prop_cond \<alpha> \<beta>  
+       then RAnd (rewrite \<alpha> Same) ((RNeg (rewrite (RAnd \<alpha> \<beta>) Same)))  
+       else let \<alpha>' = rewrite \<alpha> Same; \<beta>' = rewrite \<beta> Same in RAnd \<alpha>' (RNeg \<beta>'))"
+(*(*5_2*) | "rewrite (RAnd (RNeg \<beta>) \<alpha>) =
+      (if prop_cond \<alpha> \<beta>  
+       then RAnd (rewrite \<alpha>) ((RNeg (rewrite (RAnd \<alpha> \<beta>))))  
+       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in RAnd \<alpha>' (RNeg \<beta>'))"*)
+(*10,12*) | "rewrite (RAnd \<alpha> (RSince \<beta> I \<gamma>)) t =
+      (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I) then RAnd (rewrite \<alpha> Same) (RSince (rewrite (RAnd (RDiamondW (init_int I) \<alpha>) \<beta>) Same) I (rewrite \<gamma> Same))
+       else if (prop_cond \<alpha> \<gamma>) \<and> (finite_int I) then RAnd (rewrite \<alpha> Same) (RSince (rewrite \<beta> Same) I (rewrite (RAnd (RDiamondW I \<alpha>) \<gamma>) Same))
+       else let \<alpha>' = rewrite \<alpha> Same; \<beta>' = rewrite \<beta> Same;  \<gamma>' = rewrite \<gamma> Same in RAnd \<alpha>' (RSince \<beta>' I \<gamma>'))"
+(*(*10_2,12_2*) | "rewrite (RAnd (RSince \<beta> I \<gamma>) \<alpha>) =
+      (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I) then RAnd (rewrite \<alpha>) (RSince (rewrite (RAnd (RDiamondW (init_int I) \<alpha>) \<beta>)) I (rewrite \<gamma>))
+       else if (prop_cond \<alpha> \<gamma>) \<and> (finite_int I) then RAnd (rewrite \<alpha>) (RSince (rewrite \<beta>) I (rewrite (RAnd (RDiamondW I \<alpha>) \<gamma>)))
+       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in RAnd \<alpha>' (RSince \<beta>' I \<gamma>'))"*)
+(*11,13*) | "rewrite (RAnd \<alpha> (RUntil \<beta> I \<gamma>)) t =
+      (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I) then RAnd (rewrite \<alpha> Same) (RUntil (rewrite (RAnd (RDiamondB (init_int I) \<alpha>) \<beta>) Same) I (rewrite \<gamma> Same))
+       else if (prop_cond \<alpha> \<gamma>) \<and> (finite_int I) then RAnd (rewrite \<alpha> Same) (RUntil (rewrite \<beta> Same) I (rewrite (RAnd (RDiamondB I \<alpha>) \<gamma>) Same))
+       else let \<alpha>' = rewrite \<alpha> Same; \<beta>' = rewrite \<beta> Same;  \<gamma>' = rewrite \<gamma> Same in RAnd \<alpha>' (RUntil \<beta>' I \<gamma>'))"
+(*(*11_2,13_2*) | "rewrite (RAnd (RUntil \<beta> I \<gamma>) \<alpha>) =
+      (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I) then RAnd (rewrite \<alpha>) (RUntil (rewrite (RAnd (RDiamondB (init_int I) \<alpha>) \<beta>)) I (rewrite \<gamma>))
+       else if (prop_cond \<alpha> \<gamma>) \<and> (finite_int I) then RAnd (rewrite \<alpha>) (RUntil (rewrite \<beta>) I (rewrite (RAnd (RDiamondB I \<alpha>) \<gamma>)))
+       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in RAnd \<alpha>' (RUntil \<beta>' I \<gamma>'))"*)
+(*18*) | "rewrite (RAnd \<alpha> (RDiamondB I \<beta>)) t =
+      (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I)
+       then RAnd (rewrite \<alpha> Same) (RDiamondB I (RAnd (RDiamondW I (rewrite \<alpha> Same)) (rewrite \<beta> Same)))
+       else let \<alpha>' = rewrite \<alpha> Same; \<beta>' = rewrite \<beta> Same in RAnd \<alpha>' (RDiamondB I \<beta>'))"
+(*(*18_2*) | "rewrite (RAnd (RDiamondB I \<beta>) \<alpha>) =
+      (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I)
+       then RAnd (rewrite \<alpha>) (RDiamondB I (RAnd (RDiamondW I (rewrite \<alpha>)) (rewrite \<beta>)))
+       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in RAnd \<alpha>' (RDiamondB I \<beta>'))"*)
+(*19*) | "rewrite (RAnd \<alpha> (RDiamondW I \<beta>)) t =
+      (if (prop_cond \<alpha> \<beta>)
+       then RAnd (rewrite \<alpha> Same) (RDiamondW I (RAnd (RDiamondB I (rewrite \<alpha> Same)) (rewrite \<beta> Same)))
+       else let \<alpha>' = rewrite \<alpha> Same; \<beta>' = rewrite \<beta> Same in RAnd \<alpha>' (RDiamondW I \<beta>'))"
+(*(*19_2*) | "rewrite (RAnd (RDiamondW I \<beta>) \<alpha>) =
+      (if (prop_cond \<alpha> \<beta>)
+       then RAnd (rewrite \<alpha>) (RDiamondW I (RAnd (RDiamondB I (rewrite \<alpha>)) (rewrite \<beta>)))
+       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in RAnd \<alpha>' (RDiamondW I \<beta>'))"*)
+ (*20*) | "rewrite (RAnd \<alpha> (RSquareB I \<beta>)) t =
+      (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I)
+       then RAnd (rewrite \<alpha> Same) (RSquareB I (RAnd (RDiamondW I (rewrite \<alpha> Same)) (rewrite \<beta> Same)))
+       else let \<alpha>' = rewrite \<alpha> Same; \<beta>' = rewrite \<beta> Same in RAnd \<alpha>' (RSquareB I \<beta>'))" (*some of these rules don't rewrite the conjunction, of diamond/square, because it doesn't increase rr of the conjunction more than recursing the leaves*)
+(*(*20_2*) | "rewrite (RAnd (RSquareB I \<beta>) \<alpha>) =
+      (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I)
+       then RAnd (rewrite \<alpha>) (RSquareB I (RAnd (RDiamondW I (rewrite \<alpha>)) (rewrite \<beta>)))
+       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in RAnd \<alpha>' (RSquareB I \<beta>'))"*)
+ (*21*) | "rewrite (RAnd \<alpha> (RSquareW I \<beta>)) t =
+      (if (prop_cond \<alpha> \<beta>)
+       then RAnd (rewrite \<alpha> Same) (RSquareW I (RAnd (RDiamondB I (rewrite \<alpha> Same)) (rewrite \<beta> Same)))
+       else let \<alpha>' = rewrite \<alpha> Same; \<beta>' = rewrite \<beta> Same in RAnd \<alpha>' (RSquareW I \<beta>'))"
+(* (*21_2*) | "rewrite (RAnd (RSquareW I \<beta>) \<alpha>) =
+      (if (prop_cond \<alpha> \<beta>)
+       then RAnd (rewrite \<alpha>) (RSquareW I (RAnd (RDiamondB I (rewrite \<alpha>)) (rewrite \<beta>)))
+       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in RAnd \<alpha>' (RSquareW I \<beta>'))"*)
+ (*22*) | "rewrite (RAnd \<alpha> (RPrev I \<beta>)) t =
+      (if (prop_cond \<alpha> \<beta>)
+       then RAnd (rewrite \<alpha> Same) (RPrev I (RAnd (RNext I (rewrite \<alpha> Same)) (rewrite \<beta> Same)))
+       else let \<alpha>' = rewrite \<alpha> Same; \<beta>' = rewrite \<beta> Same in RAnd \<alpha>' (RPrev I \<beta>'))"
+(*(*22_2*) | "rewrite (RAnd (RPrev I \<beta>) \<alpha>) =
+      (if (prop_cond \<alpha> \<beta>)
+       then RAnd (rewrite \<alpha>) (RPrev I (RAnd (RNext I (rewrite \<alpha>)) (rewrite \<beta>)))
+       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in RAnd \<alpha>' (RPrev I \<beta>'))"*)
+(*23*) | "rewrite (RAnd \<alpha> (RNext I \<beta>)) t =
+      (if (prop_cond \<alpha> \<beta>)
+       then RAnd (rewrite \<alpha> Same) (RNext I (RAnd (RPrev I (rewrite \<alpha> Same)) (rewrite \<beta> Same)))
+       else let \<alpha>' = rewrite \<alpha> Same; \<beta>' = rewrite \<beta> Same in (RAnd \<alpha>' (RNext I \<beta>')))"
+(*(*23_2*) | "rewrite (RAnd (RNext I \<beta>) \<alpha>) =
+      (if (prop_cond \<alpha> \<beta>)
+       then RAnd (rewrite \<alpha>) (RNext I (RAnd (RPrev I (rewrite \<alpha>)) (rewrite \<beta>)))
+       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in (RAnd \<alpha>' (RNext I \<beta>')))"*)
+
+(*6,8*)| "rewrite (RSince (RAnd \<alpha> \<gamma>) I \<beta>) t =  (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I)
+                               then RSince (rewrite (RAnd \<alpha> \<gamma>) Same) I (rewrite (RAnd (RDiamondW I \<alpha>) \<beta>) Same)
+                               else let \<alpha>' = rewrite \<alpha> Same ; \<beta>' = rewrite \<beta> Same ;  \<gamma>' = rewrite \<gamma> Same  in RSince (RAnd \<alpha>' \<gamma>') I \<beta>')"
+(*|"rewrite (RSince \<beta> I (RAnd \<alpha> \<gamma>)) = (if (prop_cond \<alpha> \<beta>)
+                                then RSince (rewrite (RAnd (RDiamondB I \<alpha>) \<beta>) ) I (rewrite (RAnd \<alpha> \<gamma>) )
+                                else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta> ;  \<gamma>' = rewrite \<gamma>  in RSince \<beta>' I (RAnd \<alpha>' \<gamma>'))"*)
+
+(*7,9*) | "rewrite (RUntil (RAnd \<alpha> \<gamma>) I \<beta>) Same = (if (prop_cond \<alpha> \<beta>)
+                                  then RUntil (rewrite (RAnd \<alpha> \<gamma>) Same) I (rewrite (RAnd (RDiamondB I \<alpha>) \<beta>) Same )
+                                else let \<alpha>' = rewrite \<alpha> Same ; \<beta>' = rewrite \<beta> Same ;  \<gamma>' = rewrite \<gamma> Same  in RUntil (RAnd \<alpha>' \<gamma>') I \<beta>')"
+| "rewrite (RUntil (RAnd \<alpha> \<gamma>) I \<beta>) Swapped =(if (prop_cond \<alpha> \<beta>)
+                                then RUntil (rewrite (RAnd (RDiamondW I \<alpha>) \<beta>) Same ) I (rewrite (RAnd \<alpha> \<gamma>) Same )
+                                else let \<alpha>' = rewrite \<alpha> Same; \<beta>' = rewrite \<beta> Same ;  \<gamma>' = rewrite \<gamma> Same in RUntil \<beta>' I (RAnd \<alpha>' \<gamma>'))"
+
+
+| "rewrite f t = f"
+
+  by pat_completeness auto
+termination
+  apply(relation "measures [(\<lambda>(f,t). (my_size f)),(\<lambda>(f,t). size_argpos t)]")
+  apply (auto simp add: shift_size not_zero) (*not_zero important because size of constructor then depends on its' number of arguments*)
+  done
 
 inductive f_conr where
 or_con1: "f_conr (\<lambda>r. ROr r \<alpha>)"|
