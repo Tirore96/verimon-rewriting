@@ -2,6 +2,29 @@ theory Rewriting
     imports "MFODL_Monitor_Optimized.Formula" "MFODL_Monitor_Optimized.Regex" "MFODL_Monitor_Optimized.Trace"
 begin
 
+datatype (discs_sels) tformula = 
+    TPred Formula.name "Formula.trm list"
+  | TLet Formula.name nat tformula tformula
+  | TEq Formula.trm Formula.trm 
+  | TLess Formula.trm Formula.trm 
+  | TLessEq Formula.trm Formula.trm
+  | TNeg tformula 
+  | TOr tformula tformula 
+  | TAnd tformula tformula 
+  | TAnds "tformula list"
+  | TExists tformula
+  | TAgg nat Formula.agg_op nat Formula.trm tformula
+  | TPrev \<I> tformula 
+  | TNext \<I> tformula
+  | TSince tformula \<I> tformula 
+  | TUntil tformula \<I> tformula
+  | TDiamondB \<I> tformula 
+  | TSquareB \<I> tformula
+  | TDiamondW \<I> tformula 
+  | TSquareW \<I> tformula
+  | TMatchF \<I> "tformula Regex.regex" 
+  | TMatchP \<I> "tformula Regex.regex"
+
 datatype (discs_sels) rformula = RPred Formula.name "Formula.trm list"
   | RLet Formula.name nat rformula rformula
   | REq Formula.trm Formula.trm | RLess Formula.trm Formula.trm | RLessEq Formula.trm Formula.trm
@@ -18,87 +41,170 @@ datatype (discs_sels) rformula = RPred Formula.name "Formula.trm list"
 abbreviation TT where "TT \<equiv> Formula.Eq (Formula.Const (EInt (0 :: integer))) (Formula.Const (EInt 0))"
 abbreviation FF where "FF \<equiv> Formula.Neg TT"
 
-fun embed :: "Formula.formula \<Rightarrow> rformula" where
-  "embed (Formula.Pred r ts) = RPred r ts"
-| "embed (Formula.Let p b \<phi> \<psi>) = RLet p b (embed \<phi>) (embed \<psi>)"
-| "embed (Formula.Eq t1 t2) = REq t1 t2"
-| "embed (Formula.Less t1 t2) = RLess t1 t2"
-| "embed (Formula.LessEq t1 t2) = RLessEq t1 t2"
+fun embed1 :: "Formula.formula \<Rightarrow> tformula" where
+ "embed1 (Formula.Ands \<phi>s) = TAnds (map embed1 \<phi>s)"
+| "embed1 (Formula.MatchF I r) = TMatchF I (regex.map_regex embed1 r)"
+| "embed1 (Formula.MatchP I r) = TMatchP I (regex.map_regex embed1 r)"
 
-| "embed (Formula.Neg (Formula.Since (Formula.Neg \<phi>) I (Formula.Neg \<psi>))) = (if \<phi> = TT then 
-    RSquareB I (embed \<psi>) else RTrigger (embed \<phi>) I (embed  \<psi>))"
-| "embed (Formula.Neg (Formula.Until (Formula.Neg \<phi>) I (Formula.Neg \<psi>))) =  (if \<phi> = TT then 
-    RSquareW I (embed \<psi>) else RRelease (embed \<phi>) I (embed \<psi>))"
-| "embed (Formula.Neg \<phi>) = RNeg (embed \<phi>)"
+|  "embed1 (Formula.Pred r ts) = TPred r ts"
+| "embed1 (Formula.Let p b \<phi> \<psi>) = TLet p b (embed1 \<phi>) (embed1 \<psi>)"
+| "embed1 (Formula.Eq t1 t2) = TEq t1 t2"
+| "embed1 (Formula.Less t1 t2) = TLess t1 t2"
+| "embed1 (Formula.LessEq t1 t2) = TLessEq t1 t2"
 
-| "embed (Formula.Or \<phi> \<psi>) = ROr (embed \<phi>) (embed \<psi>)"
-| "embed (Formula.And \<phi> \<psi>) = RAnd (embed \<phi>) (embed \<psi>)"
-| "embed (Formula.Ands \<phi>s) = RAnds (map embed \<phi>s)"
+| "embed1 (Formula.Neg (Formula.Since \<phi> I (Formula.Neg \<psi>))) = (if \<phi> = TT then 
+    TSquareB I (embed1 \<psi>) else TNeg (TSince (embed1 \<phi>) I (TNeg (embed1 \<psi>))))"
+| "embed1 (Formula.Neg (Formula.Until \<phi> I (Formula.Neg \<psi>))) =  (if \<phi> = TT then 
+    TSquareW I (embed1 \<psi>) else TNeg (TUntil (embed1 \<phi>) I (TNeg (embed1 \<psi>))))"
 
-| "embed (Formula.Exists \<phi>) = RExists (embed \<phi>)"
-| "embed (Formula.Agg y \<omega> b' f \<phi>) = RAgg y \<omega> b' f (embed \<phi>)"
-| "embed (Formula.Prev I \<phi>) = RPrev I (embed \<phi>)"
-| "embed (Formula.Next I \<phi>) = RNext I (embed \<phi>)"
+| "embed1 (Formula.Neg \<phi>) = TNeg (embed1 \<phi>)"
 
-| "embed (Formula.Since \<phi> I \<psi>) = (if \<phi> = TT then RDiamondB I (embed \<psi>)
-                                             else RSince (embed \<phi>) I (embed \<psi>))"
+| "embed1 (Formula.Or \<phi> \<psi>) = TOr (embed1 \<phi>) (embed1 \<psi>)"
+| "embed1 (Formula.And \<phi> \<psi>) = TAnd (embed1 \<phi>) (embed1 \<psi>)"
 
-| "embed (Formula.Until \<phi> I \<psi>) = (if \<phi> = TT then RDiamondW I (embed \<psi>)
-                                             else RUntil (embed \<phi>) I (embed \<psi>))"
+| "embed1 (Formula.Exists \<phi>) = TExists (embed1 \<phi>)"
+| "embed1 (Formula.Agg y \<omega> b' f \<phi>) = TAgg y \<omega> b' f (embed1 \<phi>)"
+| "embed1 (Formula.Prev I \<phi>) = TPrev I (embed1 \<phi>)"
+| "embed1 (Formula.Next I \<phi>) = TNext I (embed1 \<phi>)"
 
-| "embed (Formula.MatchF I r) = RMatchF I (regex.map_regex embed r)"
-| "embed (Formula.MatchP I r) = RMatchP I (regex.map_regex embed r)"
+| "embed1 (Formula.Since \<phi> I \<psi>) = (if \<phi> = TT then TDiamondB I (embed1 \<psi>)
+                                             else TSince (embed1 \<phi>) I (embed1 \<psi>))"
 
-
-fun project :: "rformula \<Rightarrow> Formula.formula" where
-  "project (RPred r ts)  = Formula.Pred r ts"
-| "project (RLet p b \<phi> \<psi>) =  Formula.Let p b (project \<phi>) (project \<psi>)"
-| "project (REq t1 t2) =Formula.Eq t1 t2"
-| "project (RLess t1 t2) =Formula.Less t1 t2"
-| "project (RLessEq t1 t2) =Formula.LessEq t1 t2"
-
-| "project (RSquareB I \<psi>) = Formula.Neg (Formula.Since (Formula.Neg TT) I (Formula.Neg (project \<psi>)))"
-| "project (RTrigger \<phi> I \<psi>) = Formula.Neg (Formula.Since (Formula.Neg (project \<phi>)) I (Formula.Neg (project \<psi>)))"
-
-| "project (RSquareW I \<psi>) = Formula.Neg (Formula.Until (Formula.Neg TT) I (Formula.Neg (project \<psi>)))"
-| "project (RRelease \<phi> I \<psi>) = Formula.Neg (Formula.Until (Formula.Neg (project \<phi>)) I (Formula.Neg (project \<psi>)))"
-
-| "project (RNeg \<phi>) = Formula.Neg (project \<phi>)"
-| "project (ROr \<phi> \<psi>) = Formula.Or (project \<phi>) (project \<psi>)"
-| "project (RAnd \<phi> \<psi>) = Formula.And (project \<phi>) (project \<psi>)"
-| "project (RAnds \<phi>s) = Formula.Ands (map project \<phi>s)"
-
-| "project (RExists \<phi>) = Formula.Exists (project \<phi>)"
-| "project (RAgg y \<omega> b' f \<phi>) = Formula.Agg y \<omega> b' f (project \<phi>)"
-| "project (RPrev I \<phi>) = Formula.Prev I (project \<phi>)"
-| "project (RNext I \<phi>) = Formula.Next I (project \<phi>)"
-| "project (RDiamondB I \<phi>) = Formula.Since TT I (project \<phi>)"
-| "project (RSince \<phi> I \<psi>) = Formula.Since (project \<phi>) I (project \<psi>)"
-
-| "project (RDiamondW I \<phi>) = Formula.Until TT I (project \<phi>)"
-| "project (RUntil \<phi> I \<psi>) = Formula.Until (project \<phi>) I (project \<psi>)"
-
-| "project (RMatchF I r) = Formula.MatchF I (regex.map_regex project r)"
-| "project (RMatchP I r) = Formula.MatchP I (regex.map_regex project r)"
+| "embed1 (Formula.Until \<phi> I \<psi>) = (if \<phi> = TT then TDiamondW I (embed1 \<psi>)
+                                             else TUntil (embed1 \<phi>) I (embed1 \<psi>))"
 
 
-lemma project_conj[fundef_cong]: "f1 = f2 \<Longrightarrow> project f1 = project f2" by auto
+fun embed2 where
+  "embed2 (TAnds \<phi>s) = RAnds (map embed2 \<phi>s)"
+| "embed2 (TMatchF I r) = RMatchF I (regex.map_regex embed2 r)"
+| "embed2 (TMatchP I r) = RMatchP I (regex.map_regex embed2 r)"
+| "embed2 (TNeg (TSince (TNeg \<phi>) I (TNeg \<psi>))) =  RTrigger (embed2 \<phi>) I (embed2  \<psi>)"
+| "embed2 (TNeg (TUntil (TNeg \<phi>) I (TNeg \<psi>))) =   RRelease (embed2 \<phi>) I (embed2 \<psi>)"
+| "embed2 (TPred r ts) = RPred r ts"
+| "embed2 (TLet p b \<phi> \<psi>) = RLet p b (embed2 \<phi>) (embed2 \<psi>)"
+| "embed2 (TEq t1 t2) = REq t1 t2"
+| "embed2 (TLess t1 t2) = RLess t1 t2"
+| "embed2 (TLessEq t1 t2) = RLessEq t1 t2"
+| "embed2 (TNeg \<phi>) = RNeg (embed2 \<phi>)"
+
+| "embed2 (TOr \<phi> \<psi>) = ROr (embed2 \<phi>) (embed2 \<psi>)"
+| "embed2 (TAnd \<phi> \<psi>) = RAnd (embed2 \<phi>) (embed2 \<psi>)"
+
+| "embed2 (TExists \<phi>) = RExists (embed2 \<phi>)"
+| "embed2 (TAgg y \<omega> b' f \<phi>) = RAgg y \<omega> b' f (embed2 \<phi>)"
+| "embed2 (TPrev I \<phi>) = RPrev I (embed2 \<phi>)"
+| "embed2 (TNext I \<phi>) = RNext I (embed2 \<phi>)"
+
+| "embed2 (TSince \<phi> I \<psi>) = RSince (embed2 \<phi>) I (embed2 \<psi>)"
+
+| "embed2 (TUntil \<phi> I \<psi>) =  RUntil (embed2 \<phi>) I (embed2 \<psi>)"
+
+| "embed2 (TDiamondW I a) = RDiamondW I (embed2 a) "
+| "embed2 (TDiamondB I a) = RDiamondB I (embed2 a) "
+| "embed2 (TSquareW I a) = RSquareW I (embed2 a) "
+| "embed2 (TSquareB I a) = RSquareB I (embed2 a) "
+
+
+
+fun project2 where
+ "project2  (RTrigger \<phi> I \<psi>) =  TNeg (TSince (TNeg (project2 \<phi>)) I (TNeg (project2 \<psi>)))"
+| "project2 (RRelease  \<phi> I \<psi>) =  TNeg (TUntil (TNeg (project2 \<phi>)) I (TNeg (project2 \<psi>)))  "
+|  "project2 (RPred r ts) = TPred r ts"
+| "project2 (RLet p b \<phi> \<psi>) = TLet p b (project2 \<phi>) (project2 \<psi>)"
+| "project2 (REq t1 t2) = TEq t1 t2"
+| "project2 (RLess t1 t2) = TLess t1 t2"
+| "project2 (RLessEq t1 t2) = TLessEq t1 t2"
+| "project2 (RNeg \<phi>) = TNeg (project2 \<phi>)"
+
+| "project2 (ROr \<phi> \<psi>) = TOr (project2 \<phi>) (project2 \<psi>)"
+| "project2 (RAnd \<phi> \<psi>) = TAnd (project2 \<phi>) (project2 \<psi>)"
+| "project2 (RAnds \<phi>s) = TAnds (map project2 \<phi>s)"
+
+| "project2 (RExists \<phi>) = TExists (project2 \<phi>)"
+| "project2 (RAgg y \<omega> b' f \<phi>) = TAgg y \<omega> b' f (project2 \<phi>)"
+| "project2 (RPrev I \<phi>) = TPrev I (project2 \<phi>)"
+| "project2 (RNext I \<phi>) = TNext I (project2 \<phi>)"
+
+| "project2 (RSince \<phi> I \<psi>) = TSince (project2 \<phi>) I (project2 \<psi>)"
+
+| "project2 (RUntil \<phi> I \<psi>) =  TUntil (project2 \<phi>) I (project2 \<psi>)"
+
+| "project2 (RMatchF I r) = TMatchF I (regex.map_regex project2 r)"
+| "project2 (RMatchP I r) = TMatchP I (regex.map_regex project2 r)"
+| "project2 (RDiamondW I a) = TDiamondW I (project2 a) "
+| "project2 (RDiamondB I a) = TDiamondB I (project2 a) "
+| "project2 (RSquareW I a) = TSquareW I (project2 a) "
+| "project2 (RSquareB I a) = TSquareB I (project2 a) "
+
+fun project1 :: "tformula \<Rightarrow> Formula.formula" where
+  "project1 (TPred r ts)  = Formula.Pred r ts"
+| "project1 (TLet p b \<phi> \<psi>) =  Formula.Let p b (project1 \<phi>) (project1 \<psi>)"
+| "project1 (TEq t1 t2) =Formula.Eq t1 t2"
+| "project1 (TLess t1 t2) =Formula.Less t1 t2"
+| "project1 (TLessEq t1 t2) =Formula.LessEq t1 t2"
+
+| "project1 (TSquareB I \<psi>) = Formula.Neg (Formula.Since TT I (Formula.Neg (project1 \<psi>)))"
+
+| "project1 (TSquareW I \<psi>) = Formula.Neg (Formula.Until TT I (Formula.Neg (project1 \<psi>)))"
+
+| "project1 (TNeg \<phi>) = Formula.Neg (project1 \<phi>)"
+| "project1 (TOr \<phi> \<psi>) = Formula.Or (project1 \<phi>) (project1 \<psi>)"
+| "project1 (TAnd \<phi> \<psi>) = Formula.And (project1 \<phi>) (project1 \<psi>)"
+| "project1 (TAnds \<phi>s) = Formula.Ands (map project1 \<phi>s)"
+
+| "project1 (TExists \<phi>) = Formula.Exists (project1 \<phi>)"
+| "project1 (TAgg y \<omega> b' f \<phi>) = Formula.Agg y \<omega> b' f (project1 \<phi>)"
+| "project1 (TPrev I \<phi>) = Formula.Prev I (project1 \<phi>)"
+| "project1 (TNext I \<phi>) = Formula.Next I (project1 \<phi>)"
+| "project1 (TDiamondB I \<phi>) = Formula.Since TT I (project1 \<phi>)"
+| "project1 (TSince \<phi> I \<psi>) = Formula.Since (project1 \<phi>) I (project1 \<psi>)"
+
+| "project1 (TDiamondW I \<phi>) = Formula.Until TT I (project1 \<phi>)"
+| "project1 (TUntil \<phi> I \<psi>) = Formula.Until (project1 \<phi>) I (project1 \<psi>)"
+
+| "project1 (TMatchF I r) = Formula.MatchF I (regex.map_regex project1 r)"
+| "project1 (TMatchP I r) = Formula.MatchP I (regex.map_regex project1 r)"
+
+
+
+
+lemma project_embed1: "(project1 \<circ> embed1) f = f" 
+proof(induction f rule:embed1.induct)
+case (1 \<phi>s)
+then show ?case sorry
+next
+  case (2 I r)
+  then show ?case by (induction r;auto)
+next
+  case (3 I r)
+  then show ?case by (induction r;auto)
+qed auto
+
+definition embed where
+ "embed f = embed2 (embed1 f)"
+
+definition project where
+ "project f = project1 (project2 f)"
+
+
+lemma project_embed2: "project2 (embed2 r) = r"
+proof(induction r rule:embed2.induct)
+  case (1 \<phi>s)
+  then show ?case sorry
+next
+  case (2 I r)
+  then show ?case by (induction r;auto)
+next
+  case (3 I r)
+  then show ?case by (induction r;auto)
+qed auto
+
+
+lemma project_embed: "project (embed f) = f"
+  using Rewriting.embed_def project_def project_embed1 project_embed2 by auto
 
 definition rsat where "rsat \<sigma> V v i \<phi> = Formula.sat \<sigma> V v i (project \<phi>)"
 
-(*lemma "rsat \<sigma> V v i (embed \<phi>) = Formula.sat \<sigma> V v i \<phi>"
-  apply (induct \<phi> arbitrary: V v i rule: embed.induct)
-                      apply (auto simp: rsat_def)*)
-  
-
-(*
-definition propagate_cond where
-  "propagate_cond f1 f2 =
-      (let rr1, b1 = rr f1;
-           rr2, b2 = rr f2; 
-           fv2 = Formula.fv f2 
-      in  (rr1 \<inter> (fv2 \<setminus> rr2)) \<supset> \<emptyset> )"
-*)
 
 (*fun tvars :: "Formula.trm \<Rightarrow> nat set" where
   "tvars (Var x) = (if b \<le> x then {x} else {})"
@@ -192,109 +298,79 @@ primrec tvars where
 |"tvars (Formula.Mod t1 t2) =  (tvars t1)@ (tvars t2)"
 
 
-primrec rr :: "nat \<Rightarrow> rformula \<Rightarrow> nat list" where
-  "rr b (RPred r ts) = (concat (map tvars ts))"
+primrec rr :: "nat \<Rightarrow> rformula \<Rightarrow> nat set" where
+  "rr b (RPred r ts) = (\<Union>t\<in>set ts. Formula.fvi_trm b t)"
 | "rr b (RLet p _ \<phi> \<psi>) = rr b \<psi>"
 | "rr  b(REq t1 t2) = (case (t1,t2) of
-                             (Formula.Var x,Formula.Const _) \<Rightarrow> [x-b]
-                            |(Formula.Const _,Formula.Var x) \<Rightarrow> [x-b]
-                            | _ \<Rightarrow> [])"
+                             (Formula.Var x,Formula.Const _) \<Rightarrow> {x-b}
+                            |(Formula.Const _,Formula.Var x) \<Rightarrow> {x-b}
+                            | _ \<Rightarrow> {})"
 
 | "rr b (RLess t1 t2) = (case (t1,t2) of
-                        (Formula.Var x,Formula.Const _) \<Rightarrow> [x-b]
-                        |_ \<Rightarrow> [])"
+                        (Formula.Var x,Formula.Const _) \<Rightarrow> {x-b}
+                        |_ \<Rightarrow> {})"
 | "rr b (RLessEq t1 t2) = (case (t1,t2) of
-                                              (Formula.Var x,Formula.Const _) \<Rightarrow> [x-b]
-                                             |_ \<Rightarrow> [])"
-| "rr b (ROr \<phi> \<psi>) =  (rr b \<phi>) @ (rr b \<psi>)"
-| "rr b (RAnd \<phi> \<psi>) = (let l = rr b \<psi> in  filter (\<lambda>v. List.member l v) (rr b \<phi>))"
-| "rr b (RAnds \<phi>s) = (let xs = map (rr b) \<phi>s in concat xs)"
-| "rr b (RExists \<phi>) = (if (List.member (rr 0 \<phi>) 0) then rr (Suc b) \<phi>
-                                            else [])"
-| "rr b (RAgg y \<omega> b' f \<phi>) = []" (*How?*)
+                                              (Formula.Var x,Formula.Const _) \<Rightarrow> {x-b}
+                                             |_ \<Rightarrow> {})"
+| "rr b (ROr \<phi> \<psi>) =  (rr b \<phi>) \<inter> (rr b \<psi>)"
+| "rr b (RAnd \<phi> \<psi>) = rr b \<psi> \<union> (rr b \<phi>)"
+| "rr b (RAnds \<phi>s) = (let xs = map (rr b) \<phi>s in \<Union>x\<in>set xs. x)"
+| "rr b (RExists \<phi>) = (if (0 \<in> (rr 0 \<phi>)) then rr (Suc b) \<phi>
+                                            else {})"
+| "rr b (RAgg y \<omega> b' f \<phi>) = rr b \<phi>" (*How?*)
 | "rr b (RPrev I \<phi>) = rr b \<phi>"
 | "rr b (RNext I \<phi>) = rr b \<phi>"
 | "rr b (RSince \<phi> I \<psi>) = rr b \<psi>"
 | "rr b (RUntil \<phi> I \<psi>) = rr b \<psi>"
 | "rr b (RRelease \<phi> I \<psi>) = rr b \<psi>"
 | "rr b (RTrigger \<phi> I \<psi>) = rr b \<psi>"
-| "rr b (RMatchF I r) = []"
-| "rr b (RMatchP I r) = []"
-| "rr b (RNeg \<alpha>) = []"
-| "rr b (RDiamondW I \<alpha>) = []"
-| "rr b (RDiamondB I \<alpha>) = []"
-| "rr b (RSquareW I \<alpha>) = []"
-| "rr b (RSquareB I \<alpha>) = []"
+| "rr b (RMatchF I r) = {}"
+| "rr b (RMatchP I r) = {}"
+| "rr b (RNeg \<alpha>) = {}"
+| "rr b (RDiamondW I \<alpha>) = {}"
+| "rr b (RDiamondB I \<alpha>) = {}"
+| "rr b (RSquareW I \<alpha>) = {}"
+| "rr b (RSquareB I \<alpha>) = {}"
 
 
-
-primrec fvi_l_trm :: "nat \<Rightarrow> Formula.trm \<Rightarrow> nat list" where
-  "fvi_l_trm b (Formula.Var x) = (if b \<le> x then [x - b] else [])"
-| "fvi_l_trm b (Formula.Const _) = []"
-| "fvi_l_trm b (Formula.Plus x y) = (fvi_l_trm b x) @ (fvi_l_trm b y)"
-| "fvi_l_trm b (Formula.Minus x y) = (fvi_l_trm b x) @ (fvi_l_trm b y)"
-| "fvi_l_trm b (Formula.UMinus x) = fvi_l_trm b x"
-| "fvi_l_trm b (Formula.Mult x y) = (fvi_l_trm b x) @ (fvi_l_trm b y)"
-| "fvi_l_trm b (Formula.Div x y) = (fvi_l_trm b x) @ (fvi_l_trm b y)"
-| "fvi_l_trm b (Formula.Mod x y) = (fvi_l_trm b x) @ (fvi_l_trm b y)"
-| "fvi_l_trm b (Formula.F2i x) = fvi_l_trm b x"
-| "fvi_l_trm b (Formula.I2f x) = fvi_l_trm b x"
-
-primrec fv_l_regex where
-  "fv_l_regex fvl (Regex.Skip n) = []"
-| "fv_l_regex fvl (Regex.Test \<phi>) = fvl \<phi>"
-| "fv_l_regex fvl (Regex.Plus r s) = (fv_l_regex fvl r) @ (fv_l_regex fvl s)"
-| "fv_l_regex fvl (Regex.Times r s) = (fv_l_regex fvl r) @ (fv_l_regex fvl s)"
-| "fv_l_regex fvl (Regex.Star r) = fv_l_regex fvl r"
-
-
-fun fvi_l :: "nat \<Rightarrow> rformula \<Rightarrow> nat list" where
-  "fvi_l b (RPred r ts) = concat (map (fvi_l_trm b) ts)"
-| "fvi_l b (RLet p _ \<phi> \<psi>) = fvi_l b \<psi>"
-| "fvi_l b (REq t1 t2) = (fvi_l_trm b t1) @ (fvi_l_trm b t2)"
-| "fvi_l b (RLess t1 t2) = (fvi_l_trm b t1) @ (fvi_l_trm b t2)"
-| "fvi_l b (RLessEq t1 t2) = (fvi_l_trm b t1) @ (fvi_l_trm b t2)"
-| "fvi_l b (RNeg \<phi>) = fvi_l b \<phi>"
-| "fvi_l b (ROr \<phi> \<psi>) = (fvi_l b \<phi>) @ (fvi_l b \<psi>)"
-| "fvi_l b (RAnd \<phi> \<psi>) = (fvi_l b \<phi>) @ (fvi_l b \<psi>)"
-| "fvi_l b (RAnds \<phi>s) = concat (map (fvi_l b) \<phi>s)"
-| "fvi_l b (RExists \<phi>) = fvi_l (Suc b) \<phi>"
-
-| "fvi_l b (RAgg y \<omega> b' f \<phi>) = (fvi_l (b + b') \<phi>) @ (fvi_l_trm (b + b') f) @ 
-                                      (if b \<le> y then [y - b] else [])"
-| "fvi_l b (RPrev I \<phi>) = fvi_l b \<phi>"
-| "fvi_l b (RNext I \<phi>) = fvi_l b \<phi>"
-| "fvi_l b (RSince \<phi> I \<psi>) = (fvi_l b \<phi>) @ (fvi_l b \<psi>)"
-| "fvi_l b (RUntil \<phi> I \<psi>) = (fvi_l b \<phi>) @ (fvi_l b \<psi>)"
-| "fvi_l b (RMatchF I r) = []"
-| "fvi_l b (RMatchP I r) = []"
-| "fvi_l b (RRelease \<phi> I \<psi>) = (fvi_l b \<phi>) @ (fvi_l b \<psi>)"
-| "fvi_l b (RTrigger \<phi> I \<psi>) = (fvi_l b \<phi>) @ (fvi_l b \<psi>)"
-| "fvi_l b (RDiamondB I \<psi>) = fvi_l b \<psi>"
-| "fvi_l b (RDiamondW I \<psi>) = fvi_l b \<psi>"
-| "fvi_l b (RSquareB I \<psi>) = fvi_l b \<psi>"
-| "fvi_l b (RSquareW I \<psi>) = fvi_l b \<psi>"
+(*fun fvi_r :: "nat \<Rightarrow> rformula \<Rightarrow> nat set" where
+  "fvi_r b (RPred r ts) = (\<Union>t\<in>set ts. Formula.fvi_trm b t)"
+| "fvi_r b (RLet p _ \<phi> \<psi>) = fvi_r b \<psi>"
+| "fvi_r b (REq t1 t2) = Formula.fvi_trm b t1 \<union> Formula.fvi_trm b t2"
+| "fvi_r b (RLess t1 t2) = Formula.fvi_trm b t1 \<union> Formula.fvi_trm b t2"
+| "fvi_r b (RLessEq t1 t2) = Formula.fvi_trm b t1 \<union> Formula.fvi_trm b t2"
+| "fvi_r b (RNeg \<phi>) = fvi_r b \<phi>"
+| "fvi_r b (ROr \<phi> \<psi>) = fvi_r b \<phi> \<union> fvi_r b \<psi>"
+| "fvi_r b (RAnd \<phi> \<psi>) = fvi_r b \<phi> \<union> fvi_r b \<psi>"
+| "fvi_r b (RAnds \<phi>s) = (let xs = map (fvi_r b) \<phi>s in \<Union>x\<in>set xs. x)"
+| "fvi_r b (RExists \<phi>) = fvi_r (Suc b) \<phi>"
+| "fvi_r b (RAgg y \<omega> b' f \<phi>) = fvi_r (b + b') \<phi> \<union> Formula.fvi_trm (b + b') f \<union> (if b \<le> y then {y - b} else {})"
+| "fvi_r b (RPrev I \<phi>) = fvi_r b \<phi>"
+| "fvi_r b (RNext I \<phi>) = fvi_r b \<phi>"
+| "fvi_r b (RSince \<phi> I \<psi>) = fvi_r b \<phi> \<union> fvi_r b \<psi>"
+| "fvi_r b (RUntil \<phi> I \<psi>) = fvi_r b \<phi> \<union> fvi_r b \<psi>"
+| "fvi_r b (RMatchF I r) = Regex.fv_regex (fvi_r b) r"
+| "fvi_r b (RMatchP I r) = Regex.fv_regex (fvi_r b) r"
+| "fvi_r b (RRelease l I r) = fvi_r b l \<inter> fvi_r b r"
+| "fvi_r b (RTrigger l I r) = fvi_r b l \<inter> fvi_r b r"
+| "fvi_r b (RDiamondB I r) = fvi_r b r"
+| "fvi_r b (RDiamondW I r) = fvi_r b r"
+| "fvi_r b (RSquareB I r) = fvi_r b r"
+| "fvi_r b (RSquareW I r) = fvi_r b r"*)
 
 (*| "fvi_l b (Formula.MatchF I r) = fv_l_regex (fvi_l b) r"
 | "fvi_l b (Formula.MatchP I r) = fv_l_regex (fvi_l b) r"*)
 
+definition fvi_r where
+      "fvi_r b r = Formula.fvi b (project r)"
 
-definition "unrestricted \<alpha> = (length (fvi_l 0 \<alpha>)) - (length (rr 0 \<alpha>))"
 
 definition prop_cond :: "rformula \<Rightarrow> rformula \<Rightarrow> bool"where
  "prop_cond f1 f2 =
-       (let rr1 =  (rr 0) f1;
+       (let rr1 = rr 0 f1;
             rr2 = rr 0 f2; 
-            fv2 = fvi_l 0 f2
-        in (let dif = (filter (\<lambda>v. \<not>(List.member rr2 v)) fv2) 
-            in (length (filter (\<lambda>v. List.member dif v)  rr1)) > 0))"
-
-definition "list_inter a b = filter (\<lambda>v. List.member b v) a"
-
-(*lemma "(set a) \<inter> (set b) \<subseteq> list_inter a b"*)
-
-
-
+            fv2 = fvi_r 0 f2
+        in (rr1 \<inter> (fv2-rr2))\<noteq> {})"
 
 (*Section 2 of Normalization*)
 lemma sat_2_1: "(\<forall>x. Formula.sat \<sigma> V (x#v) i \<alpha>) = Formula.sat \<sigma> V v i (Formula.Neg (Formula.Exists (Formula.Neg \<alpha>)))" by simp
@@ -324,54 +400,33 @@ lemma eval_trm_shiftTI: "length xs = b \<Longrightarrow>
 lemma shift_fv_in_t: "x+1 \<in> Formula.fvi_trm b (shiftTI b t) \<longleftrightarrow> x  \<in> Formula.fvi_trm b t" 
    by (induction t;auto)
 
-primrec shiftI :: "nat \<Rightarrow> rformula \<Rightarrow> rformula" where
-  "shiftI k (RPred r ts) = RPred r (map (shiftTI k) ts)"
-| "shiftI k (RExists a) = RExists (shiftI (Suc k) a)"
-| "shiftI k (RLet nm n a b) = RLet nm n a (shiftI k b)" (*fixed error, a is not shifted*)
-| "shiftI k (REq t1 t2) = REq (shiftTI k t1) (shiftTI k t2)"
-| "shiftI k (RLess t1 t2) =  RLess (shiftTI k t1) (shiftTI k t2)"
-| "shiftI k (RLessEq t1 t2) = RLessEq (shiftTI k t1) (shiftTI k t2)"
-| "shiftI k (RNeg a) = RNeg (shiftI k a)"
-| "shiftI k (ROr a b) = ROr (shiftI k a) (shiftI k b)"
-| "shiftI k (RAnd a b) = RAnd (shiftI k a) (shiftI k b)"
-| "shiftI k (RAnds as) = RAnds (map (shiftI k) as)"  
-| "shiftI k (RAgg y op b t a) = RAgg (if y < k then y else y + 1)
-                                            op b (shiftTI (k + b) t) (shiftI (k + b) a)"
-| "shiftI k (RPrev \<I> a) = RPrev \<I> (shiftI k a)"
-| "shiftI k (RNext \<I> a) = RNext \<I> (shiftI k a)"
-| "shiftI k (RSince a1 \<I> a2) = RSince (shiftI k a1) \<I> (shiftI k a2)"
-| "shiftI k (RUntil a1 \<I> a2) = RUntil (shiftI k a1) \<I> (shiftI k a2)"
-| "shiftI k (RMatchF \<I> r) = RMatchF \<I> (Regex.map_regex (shiftI k) r)"
-| "shiftI k (RMatchP \<I> r) = RMatchP \<I> (Regex.map_regex (shiftI k) r)"
-| "shiftI k (RRelease \<phi> I \<psi>) = RRelease (shiftI k \<phi>) I (shiftI k \<psi>)"
-| "shiftI k (RTrigger \<phi> I \<psi>) = RTrigger (shiftI k \<phi>) I (shiftI k \<psi>)"
-| "shiftI k (RDiamondB I \<psi>) = RDiamondB I (shiftI k \<psi>)"
-| "shiftI k (RDiamondW I \<psi>) = RDiamondW I (shiftI k \<psi>)"
-| "shiftI k (RSquareB I \<psi>) = RSquareB I (shiftI k \<psi>)"
-| "shiftI k (RSquareW I \<psi>) = RSquareW I (shiftI k \<psi>)"
+(*primrec shiftI_r :: "nat \<Rightarrow> rformula \<Rightarrow> rformula" where
+  "shiftI_r k (RPred r ts) = RPred r (map (shiftTI k) ts)"
+| "shiftI_r k (RExists a) = RExists (shiftI_r (Suc k) a)"
+| "shiftI_r k (RLet nm n a b) = RLet nm n a (shiftI_r k b)" (*fixed error, a is not shifted*)
+| "shiftI_r k (REq t1 t2) = REq (shiftTI k t1) (shiftTI k t2)"
+| "shiftI_r k (RLess t1 t2) =  RLess (shiftTI k t1) (shiftTI k t2)"
+| "shiftI_r k (RLessEq t1 t2) = RLessEq (shiftTI k t1) (shiftTI k t2)"
+| "shiftI_r k (RNeg a) = RNeg (shiftI_r k a)"
+| "shiftI_r k (ROr a b) = ROr (shiftI_r k a) (shiftI_r k b)"
+| "shiftI_r k (RAnd a b) = RAnd (shiftI_r k a) (shiftI_r k b)"
+| "shiftI_r k (RAnds as) = RAnds (map (shiftI_r k) as)"  
+| "shiftI_r k (RAgg y op b t a) = RAgg (if y < k then y else y + 1)
+                                            op b (shiftTI (k + b) t) (shiftI_r (k + b) a)"
+| "shiftI_r k (RPrev \<I> a) = RPrev \<I> (shiftI_r k a)"
+| "shiftI_r k (RNext \<I> a) = RNext \<I> (shiftI_r k a)"
+| "shiftI_r k (RSince a1 \<I> a2) = RSince (shiftI_r k a1) \<I> (shiftI_r k a2)"
+| "shiftI_r k (RUntil a1 \<I> a2) = RUntil (shiftI_r k a1) \<I> (shiftI_r k a2)"
+| "shiftI_r k (RMatchF \<I> r) = RMatchF \<I> (Regex.map_regex (shiftI_r k) r)"
+| "shiftI_r k (RMatchP \<I> r) = RMatchP \<I> (Regex.map_regex (shiftI_r k) r)"
+| "shiftI_r k (RRelease \<phi> I \<psi>) = RRelease (shiftI_r k \<phi>) I (shiftI_r k \<psi>)"
+| "shiftI_r k (RTrigger \<phi> I \<psi>) = RTrigger (shiftI_r k \<phi>) I (shiftI_r k \<psi>)"
+| "shiftI_r k (RDiamondB I \<psi>) = RDiamondB I (shiftI_r k \<psi>)"
+| "shiftI_r k (RDiamondW I \<psi>) = RDiamondW I (shiftI_r k \<psi>)"
+| "shiftI_r k (RSquareB I \<psi>) = RSquareB I (shiftI_r k \<psi>)"
+| "shiftI_r k (RSquareW I \<psi>) = RSquareW I (shiftI_r k \<psi>)"*)
 
 
-abbreviation shift where "shift \<equiv> shiftI 0"
-
-(*fun shiftTI :: "nat \<Rightarrow> Formula.trm \<Rightarrow> Formula.trm" where
- "shiftTI k (Formula.Var i) = (if i < k then Formula.Var i 
-                                               else Formula.Var (i + 1))"
-| "shiftTI k (Formula.Plus t u) = Formula.Plus (shiftTI k t) (shiftTI k u)"
-| "shiftTI k (Formula.Minus t u) = Formula.Minus (shiftTI k t) (shiftTI k u)"
-| "shiftTI k (Formula.UMinus t) = Formula.UMinus (shiftTI k t)"
-| "shiftTI k (Formula.Mult t u) = Formula.Mult (shiftTI k t) (shiftTI k u)"
-| "shiftTI k (Formula.Div t u) = Formula.Div (shiftTI k t) (shiftTI k u)"
-| "shiftTI k (Formula.Mod t u) = Formula.Mod (shiftTI k t) (shiftTI k u)"
-| "shiftTI k (Formula.F2i t) = Formula.F2i (shiftTI k t)"
-| "shiftTI k (Formula.I2f t) = Formula.I2f (shiftTI k t)"
-| "shiftTI k (Formula.Const n) = (Formula.Const n)"
-
-lemma eval_trm_shiftTI: "length xs = b \<Longrightarrow>
-  Formula.eval_trm (xs @ z # v) (shiftTI b t) = Formula.eval_trm (xs @ v) t"
-  by (induct b t rule: shiftTI.induct) (auto simp: nth_append split: trm.splits)
-
-lemma shift_fv_in_t: "x+1 \<in> Formula.fvi_trm b (shiftTI b t) \<longleftrightarrow> x  \<in> Formula.fvi_trm b t" 
-   by (induction t;auto)
 
 primrec shiftI :: "nat \<Rightarrow> Formula.formula \<Rightarrow> Formula.formula" where
   "shiftI k (Formula.Pred r ts) = Formula.Pred r (map (shiftTI k) ts)"
@@ -394,7 +449,11 @@ primrec shiftI :: "nat \<Rightarrow> Formula.formula \<Rightarrow> Formula.formu
 | "shiftI k (Formula.MatchP \<I> r) = Formula.MatchP \<I> (Regex.map_regex (shiftI k) r)"
 
 
-abbreviation shift where "shift \<equiv> shiftI 0"*)
+abbreviation shift where "shift \<equiv> shiftI 0"
+
+definition shiftI_r where
+"shiftI_r b r = embed (shiftI b (project r))"
+
 
 
 lemma shift_fv_in_f: "(x+1) \<in> (Formula.fvi b (shiftI b \<phi>)) \<longleftrightarrow> x \<in> (Formula.fvi b \<phi>)"
@@ -847,382 +906,9 @@ proof(rule iffI)
   then show ?R using L j by fastforce
 qed auto
 
-(*
-datatype "constant" = SINCE | UNTIL \<I> | NEG
 
-datatype 'c "term" = App 'c "'c term list"
 
-datatype ('c, 'x) "pattern" = Var 'x | PApp 'c "('c, 'x) pattern list"
-
-fun matches where
-  "matches [] [] \<sigma> = Some \<sigma>"
-| "matches (Var x # ps) (t # ts) \<sigma> =
-     (case \<sigma> x of
-       None \<Rightarrow> matches ps ts ((\<sigma>(x \<mapsto> t)))
-     | Some u \<Rightarrow> if t = u then matches ps ts \<sigma> else None)"
-| "matches (PApp c ps # ps') (App d ts # ts') \<sigma> = (if c = d \<and> length ps = length ts then 
-     matches (ps @ ps') (ts @ ts') \<sigma> else None)"
-| "matches _ _ \<sigma> = None"
-
-fun instantiate where
-  "instantiate \<sigma> (Var x) = the (\<sigma> x)"
-| "instantiate \<sigma> (PApp c ps) = App c (map (instantiate \<sigma>) ps)"
-
-fun rewriteC1 :: "(('c, 'x) pattern \<times> ('c, 'x) pattern) list \<Rightarrow> 'c term \<Rightarrow> 'c term" where
-  "rewriteC1 [] t = t"
-| "rewriteC1 ((p, u) # rs) t =
-   (case matches [p] [t] Map.empty of
-     Some \<sigma> \<Rightarrow> instantiate \<sigma> u
-   | None \<Rightarrow> rewriteC1 rs t)"
-
-fun rewriteC :: "(('c, 'x) pattern \<times> ('c, 'x) pattern) list \<Rightarrow> 'c term \<Rightarrow> 'c term" where
-  "rewriteC rs (App c ts) = rewriteC1 rs (App c (map (rewriteC rs) ts))"
-
-fun embed where
-  "embed (Formula.Until \<phi> I \<psi>) = App (UNTIL I) [embed \<phi>, embed \<psi>]"
-*)
-
-
-(*lemma eval_cong[cong]: "\<And>P::(Formula.trm \<Rightarrow> Formula.trm). (Formula.eval_trm v t = Formula.eval_trm v t') \<Longrightarrow> Formula.eval_trm v (P t) =  Formula.eval_trm v (P t')" sorry
-lemma sat_cong[cong]: "(Formula.sat \<sigma> V v i \<alpha> = Formula.sat \<sigma> V v i \<beta>) \<Longrightarrow> Formula.sat \<sigma> V v i (P \<alpha>) = Formula.sat \<sigma> V v i (P \<beta>)" sorry*)
-
-(*future lemma, set of range restricted variables is same or less after rewriteC*)
-
-(*
-fun rewriteC1 :: "Formula.formula \<Rightarrow> Formula.formula" where
-  "rewriteC1 (Formula.And \<alpha> (Formula.Or \<beta> \<gamma>)) = (let \<alpha>' = rewriteC1 \<alpha>;
-                                                    \<beta>' = rewriteC1 \<beta>;
-                                                    \<gamma>' = rewriteC1 \<gamma>
-                                                 in if prop_cond \<alpha>' \<beta>' 
-                                                    then Formula.Or (Formula.And \<alpha>' \<beta>') (Formula.And \<alpha>' \<gamma>')
-                                                    else Formula.And \<alpha>' (Formula.Or \<beta>' \<gamma>'))"  (*Maybe also a disjunction with prop_cond a' g'*)
-| "rewriteC1 f = f"
-
-thm sat.simps
-
-lemma rewriteC1_sat: "Formula.sat \<sigma> V v i (rewriteC1 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
-proof(induction \<alpha> rule:rewriteC1.induct)
-  case (1 \<alpha> \<beta> \<gamma>)
-  then show ?case  by (simp del:sat.simps add:Let_def sat_rewriteC_1;auto)
-qed auto
-
-
-fun rewriteC2:: "Formula.formula \<Rightarrow> Formula.formula" where
-"rewriteC2 (Formula.And \<alpha> (release \<beta> I \<gamma>)) =(let \<alpha>' = rewriteC2 \<alpha>;
-                                                 \<beta>' = rewriteC2 \<beta>;
-                                                 \<gamma>' = rewriteC2 \<gamma>
-                                                in if prop_cond \<alpha>' \<beta>' 
-                                                 then Formula.And \<alpha>' (release (Formula.And \<beta>' (diamond_b (init_int I) \<alpha>')) I (Formula.And \<gamma>' (diamond_b I \<alpha>'))) 
-                                                 else Formula.And \<alpha>' (release \<beta>' I \<gamma>'))"
-| "rewriteC2 f = f"
-
-thm conj_cong
-thm sat.simps(15)
-lemma rewriteC2_sat: "Formula.sat \<sigma> V v i (rewriteC2 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
-proof(induction \<alpha> arbitrary: i rule:rewriteC2.induct)
-  case (1 \<alpha> \<beta> I \<gamma>)
-  then show ?case by (simp only:rewriteC2.simps Let_def sat_rewriteC_2[symmetric] split:if_splits;simp)
-qed auto
-
-fun rewriteC3 :: "Formula.formula \<Rightarrow> Formula.formula" where
- "rewriteC3 (Formula.And \<alpha> (trigger \<beta> I \<gamma>)) =(let \<alpha>' = rewriteC3 \<alpha>;
-                                                 \<beta>' = rewriteC3 \<beta>;
-                                                 \<gamma>' = rewriteC3 \<gamma>
-                                                in if prop_cond \<alpha>' \<beta>'  
-                                                 then Formula.And \<alpha>' (trigger (Formula.And \<beta>' (diamond_w (init_int I) \<alpha>')) I (Formula.And \<gamma>' (diamond_w I \<alpha>')))  
-                                                 else Formula.And \<alpha>' (trigger \<beta>' I \<gamma>'))"
-| "rewriteC3 f = f"
-
-lemma rewriteC3_sat: "Formula.sat \<sigma> V v i (rewriteC3 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
-proof(induction \<alpha> arbitrary: i rule:rewriteC3.induct)
-  case (1 \<alpha> \<beta> I \<gamma>)
-  then show ?case by (simp only:rewriteC3.simps Let_def sat_rewriteC_3[symmetric] split:if_splits;simp)
-qed auto
-
-fun rewriteC4 :: "Formula.formula \<Rightarrow> Formula.formula" where
- "rewriteC4 (Formula.And \<alpha> (Formula.Exists \<beta>)) =(let \<alpha>' = rewriteC4 \<alpha>;
-                                                    \<beta>' = rewriteC4 \<beta>
-                                                in if prop_cond \<alpha>' \<beta>'  
-                                                 then Formula.Exists (Formula.And (shift \<alpha>') \<beta>')  
-                                                 else Formula.And \<alpha>' (Formula.Exists \<beta>'))"
-| "rewriteC4 f = f"
-
-thm sat.simps(10)
-lemma rewriteC4_sat: "Formula.sat \<sigma> V v i (rewriteC4 f) = Formula.sat \<sigma> V v i f" 
-proof(induction f arbitrary: i v rule:rewriteC4.induct)
-  case (1 \<alpha> \<beta>)  
-  then show ?case by(simp only: rewriteC4.simps shiftI.simps sat_rewriteC_4[symmetric] Let_def split:if_splits;simp) 
-qed auto
-
-fun rewriteC5 :: "Formula.formula \<Rightarrow> Formula.formula" where
-  "rewriteC5 (Formula.And \<alpha> (Formula.Neg \<beta>)) =(let \<alpha>' = rewriteC5 \<alpha>;
-                                                 \<beta>' = rewriteC5 \<beta>
-                                                in if prop_cond \<alpha>' \<beta>'  
-                                                 then Formula.And \<alpha>' (Formula.Neg (Formula.And \<alpha>' \<beta>'))  
-                                                 else Formula.And \<alpha>' (Formula.Neg \<beta>'))"
-| "rewriteC5 f = f"
-
-
-lemma rewriteC5_sat: "Formula.sat \<sigma> V v i (rewriteC5 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
-proof(induction \<alpha> rule:rewriteC5.induct)
-  case (1 \<alpha> \<beta>)
-  then show ?case by (simp add: Let_def sat_rewriteC_5;auto)
-qed auto
-
-fun rewriteC6 :: "Formula.formula \<Rightarrow> Formula.formula" where
-  "rewriteC6 (Formula.Since (Formula.And \<alpha> \<gamma>) I \<beta> ) =(let \<alpha>' = rewriteC6 \<alpha>;
-                                                        \<beta>' = rewriteC6 \<beta>;
-                                                        \<gamma>' = rewriteC6 \<gamma>
-                                                in if prop_cond \<alpha>' \<beta>' \<and> excl_zero I 
-                                                 then Formula.Since (Formula.And \<alpha>' \<gamma>') I (Formula.And (diamond_w I \<alpha>') \<beta>')  
-                                                 else Formula.Since (Formula.And \<alpha>' \<gamma>') I \<beta>' )"
-| "rewriteC6 f = f"
-
-lemma rewriteC6_sat: "Formula.sat \<sigma> V v i (rewriteC6 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
-proof(induction \<alpha> arbitrary: i rule:rewriteC6.induct)
-  case (1 \<alpha> \<gamma> I \<beta>)
-  then show ?case  
-  proof(cases "excl_zero I")
-    thm sat_rewriteC_6[symmetric]
-    case True
-    then show ?thesis using 1 by (simp only:rewriteC6.simps Let_def sat_rewriteC_6[OF True,symmetric] split:if_splits;simp)
-  next
-    case False
-    then show ?thesis using 1 by simp
-  qed
-qed auto
-
-fun rewriteC7 :: "Formula.formula \<Rightarrow> Formula.formula" where
-  "rewriteC7 (Formula.Until (Formula.And \<alpha> \<gamma>) I \<beta> ) =(let \<alpha>' = rewriteC7 \<alpha>;
-                                                        \<beta>' = rewriteC7 \<beta>;
-                                                        \<gamma>' = rewriteC7 \<gamma>
-                                                in if prop_cond \<alpha>' \<beta>' \<and> excl_zero I 
-                                                 then Formula.Until (Formula.And \<alpha>' \<gamma>') I (Formula.And (diamond_b I \<alpha>') \<beta>')
-                                                 else Formula.Until (Formula.And \<alpha>' \<gamma>') I \<beta>')"
-| "rewriteC7 f = f"
-
-lemma rewriteC7_sat: "Formula.sat \<sigma> V v i (rewriteC7 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
-proof(induction \<alpha> arbitrary: i rule:rewriteC7.induct)
-  case (1 \<alpha> \<gamma> I \<beta>)
-  then show ?case
-  proof(cases "excl_zero I")
-    case True
-    then show ?thesis using 1 by (simp only:rewriteC7.simps Let_def sat_rewriteC_7[OF True,symmetric] split:if_splits;simp)
-  next
-    case False
-    then show ?thesis using 1 by simp
-  qed
-qed auto
-
-fun rewriteC8 :: "Formula.formula \<Rightarrow> Formula.formula" where
-  "rewriteC8 (Formula.Since \<beta> I (Formula.And \<alpha> \<gamma>)) =(let \<alpha>' = rewriteC8 \<alpha>;
-                                                        \<beta>' = rewriteC8 \<beta>;
-                                                        \<gamma>' = rewriteC8 \<gamma>
-                                                in if prop_cond \<alpha>' \<beta>'
-                                                 then Formula.Since (Formula.And (diamond_b (init_int I) \<alpha>') \<beta>') I (Formula.And \<alpha>' \<gamma>')
-                                                 else Formula.Since \<beta>' I (Formula.And \<alpha>' \<gamma>') )"
-
-| "rewriteC8 f = f"
-
-lemma rewriteC8_sat: "Formula.sat \<sigma> V v i (rewriteC8 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
-proof(induction \<alpha> arbitrary: i rule:rewriteC8.induct)
-  case (1 \<beta> I \<alpha> \<gamma>)
-  then show ?case by (simp only:rewriteC8.simps Let_def sat_rewriteC_8[symmetric] split:if_splits;simp)
-qed auto
-
-fun rewriteC9 :: "Formula.formula \<Rightarrow> Formula.formula" where
-  "rewriteC9 (Formula.Until \<beta> I (Formula.And \<alpha> \<gamma>)) =(let \<alpha>' = rewriteC9 \<alpha>;
-                                                        \<beta>' = rewriteC9 \<beta>;
-                                                        \<gamma>' = rewriteC9 \<gamma>
-                                                in if prop_cond \<alpha>' \<beta>'
-                                                 then Formula.Until (Formula.And (diamond_w (init_int I) \<alpha>') \<beta>') I (Formula.And \<alpha>' \<gamma>')
-                                                 else Formula.Until \<beta>' I (Formula.And \<alpha>' \<gamma>') )"
-
-| "rewriteC9 f = f"
-
-lemma rewriteC9_sat: "Formula.sat \<sigma> V v i (rewriteC9 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
-proof(induction \<alpha> arbitrary: i rule:rewriteC9.induct)
-  case (1 \<beta> I \<alpha> \<gamma>)
-  then show ?case by (simp only:rewriteC9.simps Let_def sat_rewriteC_9[symmetric] split:if_splits;simp)
-qed auto
-
-
-fun rewriteC10 :: "Formula.formula \<Rightarrow> Formula.formula" where
-  "rewriteC10 (Formula.And \<alpha> (Formula.Since \<beta> I \<gamma>)) =(let \<alpha>' = rewriteC10 \<alpha>;
-                                                        \<beta>' = rewriteC10 \<beta>;
-                                                        \<gamma>' = rewriteC10 \<gamma>
-                                                in if prop_cond \<alpha>' \<beta>'
-                                                 then Formula.And \<alpha>' (Formula.Since (Formula.And (diamond_w (init_int I) \<alpha>') \<beta>') I \<gamma>')
-                                                 else Formula.And \<alpha>' (Formula.Since \<beta>' I \<gamma>'))"
-
-| "rewriteC10 f = f"
-
-lemma rewriteC10_sat: "Formula.sat \<sigma> V v i (rewriteC10 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
-proof(induction \<alpha> arbitrary: i rule:rewriteC10.induct)
-  case (1 \<alpha> \<beta> I \<gamma>)
-  then show ?case by (simp only:rewriteC10.simps Let_def sat_rewriteC_10[symmetric] split:if_splits;simp)
-qed auto
-
-fun rewriteC11 :: "Formula.formula \<Rightarrow> Formula.formula" where
-  "rewriteC11 (Formula.And \<alpha> (Formula.Until \<beta> I \<gamma>)) =(let \<alpha>' = rewriteC11 \<alpha>;
-                                                        \<beta>' = rewriteC11 \<beta>;
-                                                        \<gamma>' = rewriteC11 \<gamma>
-                                                in if prop_cond \<alpha>' \<beta>'
-                                                 then Formula.And \<alpha>' (Formula.Until (Formula.And (diamond_b (init_int I) \<alpha>') \<beta>') I \<gamma>')
-                                                 else Formula.And \<alpha>' (Formula.Until \<beta>' I \<gamma>'))"
-
-| "rewriteC11 f = f"
-
-lemma rewriteC11_sat: "Formula.sat \<sigma> V v i (rewriteC11 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
-proof(induction \<alpha> arbitrary: i rule:rewriteC11.induct)
-  case (1 \<beta> I \<alpha> \<gamma>)
-  then show ?case by (simp only:rewriteC11.simps Let_def sat_rewriteC_11[symmetric] split:if_splits;simp)
-qed auto
-
-fun rewriteC12 :: "Formula.formula \<Rightarrow> Formula.formula" where
-  "rewriteC12 (Formula.And \<alpha> (Formula.Since \<gamma> I \<beta>)) =(let \<alpha>' = rewriteC12 \<alpha>;
-                                                        \<beta>' = rewriteC12 \<beta>;
-                                                        \<gamma>' = rewriteC12 \<gamma>
-                                                in if prop_cond \<alpha>' \<beta>'
-                                                 then Formula.And \<alpha>' (Formula.Since \<gamma>' I (Formula.And (diamond_w I \<alpha>') \<beta>'))
-                                                 else Formula.And \<alpha>' (Formula.Since \<gamma>' I \<beta>'))"
-
-| "rewriteC12 f = f"
-
-lemma rewriteC12_sat: "Formula.sat \<sigma> V v i (rewriteC12 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
-proof(induction \<alpha> arbitrary: i rule:rewriteC12.induct)
-  case (1)
-  then show ?case by (simp only:rewriteC12.simps Let_def sat_rewriteC_12[symmetric] split:if_splits;simp)
-qed auto
-
-fun rewriteC13 :: "Formula.formula \<Rightarrow> Formula.formula" where
-  "rewriteC13 (Formula.And \<alpha> (Formula.Until \<gamma> I \<beta>)) =(let \<alpha>' = rewriteC13 \<alpha>;
-                                                        \<beta>' = rewriteC13 \<beta>;
-                                                        \<gamma>' = rewriteC13 \<gamma>
-                                                in if prop_cond \<alpha>' \<beta>'
-                                                 then Formula.And \<alpha>' (Formula.Until \<gamma>' I (Formula.And (diamond_b I \<alpha>') \<beta>'))
-                                                 else Formula.And \<alpha>' (Formula.Until \<gamma>' I \<beta>'))"
-
-| "rewriteC13 f = f"
-
-lemma rewriteC13_sat: "Formula.sat \<sigma> V v i (rewriteC13 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
-proof(induction \<alpha> arbitrary: i rule:rewriteC13.induct)
-  case (1)
-  then show ?case by (simp only:rewriteC13.simps Let_def sat_rewriteC_13[symmetric] split:if_splits;simp)
-qed auto
-
-(*Introduced abbreviations of TT and FF to allow diamond_b abbreviation in pattern*)
-function(sequential) rewriteC18 :: "Formula.formula \<Rightarrow> Formula.formula" where
-  "rewriteC18 (Formula.And \<alpha> (diamond_b I \<beta>)) =(let \<alpha>' = rewriteC18 \<alpha>;
-                                     \<beta>' = rewriteC18 \<beta>
-                                                in if prop_cond \<alpha>' \<beta>'
-                                                 then Formula.And \<alpha>' (diamond_b I (Formula.And (diamond_w I \<alpha>') \<beta>'))
-                                                 else Formula.And \<alpha>' (diamond_b I \<beta>'))"
-
-| "rewriteC18 f = f"
-  by (pat_completeness) auto
-termination by lexicographic_order
-
-lemma rewriteC18_sat: "Formula.sat \<sigma> V v i (rewriteC18 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
-proof(induction \<alpha> arbitrary: i rule:rewriteC18.induct)
-  case (1)
-  then show ?case by (simp only:rewriteC18.simps Let_def sat_rewriteC_18[symmetric] split:if_splits;simp)
-qed auto
-
-function(sequential) rewriteC19 :: "Formula.formula \<Rightarrow> Formula.formula" where
-  "rewriteC19 (Formula.And \<alpha> (diamond_w I \<beta>)) =(let \<alpha>' = rewriteC19 \<alpha>;
-                                                   \<beta>' = rewriteC19 \<beta>
-                                                in if prop_cond \<alpha>' \<beta>'
-                                                 then Formula.And \<alpha>' (diamond_w I (Formula.And (diamond_b I \<alpha>') \<beta>'))
-                                                 else Formula.And \<alpha>' (diamond_w I \<beta>'))"
-
-| "rewriteC19 f = f"
-by (pat_completeness) auto
-
-termination by lexicographic_order
-
-lemma rewriteC19_sat: "Formula.sat \<sigma> V v i (rewriteC19 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
-proof(induction \<alpha> arbitrary: i rule:rewriteC19.induct)
-  case (1)
-  then show ?case by (simp only:rewriteC19.simps Let_def sat_rewriteC_19[symmetric] split:if_splits;simp)
-qed auto
-
-function(sequential) rewriteC20 :: "Formula.formula \<Rightarrow> Formula.formula" where
-  "rewriteC20 (Formula.And \<alpha> (square_b I \<beta>)) =(let \<alpha>' = rewriteC20 \<alpha>;
-                                                   \<beta>' = rewriteC20 \<beta>
-                                                in if prop_cond \<alpha>' \<beta>'
-                                                 then Formula.And \<alpha>' (square_b I (Formula.And (diamond_w I \<alpha>' ) \<beta>'))
-                                                 else Formula.And \<alpha>' (square_b I \<beta>'))"
-
-| "rewriteC20 f = f"
- by (pat_completeness) auto
-termination by lexicographic_order
-
-lemma rewriteC20_sat: "Formula.sat \<sigma> V v i (rewriteC20 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
-proof(induction \<alpha> arbitrary: i rule:rewriteC20.induct)
-  case (1)
-  then show ?case by (simp only:rewriteC20.simps Let_def sat_rewriteC_20[symmetric] split:if_splits;simp)
-qed auto
-
-
-function(sequential) rewriteC21 :: "Formula.formula \<Rightarrow> Formula.formula" where
-  "rewriteC21 (Formula.And \<alpha> (square_w I \<beta>)) =(let \<alpha>' = rewriteC21 \<alpha>;
-                                                   \<beta>' = rewriteC21 \<beta>
-                                                in if prop_cond \<alpha>' \<beta>'
-                                                 then Formula.And \<alpha>' (square_w I (Formula.And (diamond_b I \<alpha>') \<beta>'))
-                                                 else Formula.And \<alpha>' (square_w I \<beta>'))"
-
-| "rewriteC21 f = f"
- by (pat_completeness) auto
-termination by lexicographic_order
-
-lemma rewriteC21_sat: "Formula.sat \<sigma> V v i (rewriteC21 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
-proof(induction \<alpha> arbitrary: i rule:rewriteC21.induct)
-  case (1)
-  then show ?case by (simp only:rewriteC21.simps Let_def sat_rewriteC_21[symmetric] split:if_splits;simp)
-qed auto
-
-
-function(sequential) rewriteC22 :: "Formula.formula \<Rightarrow> Formula.formula" where
-  "rewriteC22 (Formula.And \<alpha> (Formula.Prev I \<beta>)) =(let \<alpha>' = rewriteC22 \<alpha>;
-                                                      \<beta>' = rewriteC22 \<beta>
-                                                in if prop_cond \<alpha>' \<beta>'
-                                                 then Formula.And \<alpha>' (Formula.Prev I (Formula.And (Formula.Next I \<alpha>') \<beta>'))
-                                                 else Formula.And \<alpha>' (Formula.Prev I \<beta>'))"
-
-| "rewriteC22 f = f"
- by (pat_completeness) auto
-
-termination by lexicographic_order
-
-lemma rewriteC22_sat: "Formula.sat \<sigma> V v i (rewriteC22 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
-proof(induction \<alpha> arbitrary: i rule:rewriteC22.induct)
-  case (1)
-  then show ?case by (simp only:rewriteC22.simps Let_def sat_rewriteC_22[symmetric] split:if_splits ;simp split:nat.splits)
-qed auto
-
-function(sequential) rewriteC23 :: "Formula.formula \<Rightarrow> Formula.formula" where
-  "rewriteC23 (Formula.And \<alpha> (Formula.Next I \<beta>)) =(let \<alpha>' = rewriteC23 \<alpha>;
-                                                   \<beta>' = rewriteC23 \<beta>
-                                                in if prop_cond \<alpha>' \<beta>'
-                                                 then Formula.And \<alpha>' (Formula.Next I (Formula.And (Formula.Prev I \<alpha>') \<beta>'))
-                                                 else Formula.And \<alpha>' (Formula.Next I \<beta>'))"
-
-| "rewriteC23 f = f"
- by (pat_completeness) auto
-termination by lexicographic_order
-
-lemma rewriteC23_sat: "Formula.sat \<sigma> V v i (rewriteC23 \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
-proof(induction \<alpha> arbitrary: i rule:rewriteC23.induct)
-  case (1)
-  then show ?case by (simp only:rewriteC23.simps Let_def sat_rewriteC_23[symmetric] split:if_splits;simp)
-qed auto
-*)
-
-
-(*embedded rewriteC rules*)
-
-lemma   sat_rewriteC_1_e:
+(*lemma   sat_rewriteC_1_e:
   "rsat \<sigma> V v i (RAnd \<alpha> (ROr \<beta> \<gamma>)) =
    rsat \<sigma> V v i (ROr (RAnd \<alpha> \<beta>) (RAnd \<alpha> \<gamma>))" sorry
 
@@ -1277,52 +963,9 @@ lemma sat_rewriteC_22_e: "rsat \<sigma> V v i (RAnd \<alpha> (RPrev I \<beta>)) 
                                        rsat \<sigma> V v i (RAnd \<alpha> (RPrev I (RAnd (RNext I \<alpha>) \<beta>)))"  sorry
 
 lemma sat_rewriteC_23_e: "rsat \<sigma> V v i (RAnd \<alpha> (RNext I \<beta>)) = 
-                                       rsat \<sigma> V v i (RAnd \<alpha> (RNext I (RAnd (RPrev I \<alpha>) \<beta>)))"sorry
-
-(*6.8.10.12.14.16.18.20 all need non-infinte interval for monitorability. Inlcude in rewriteC function*)
-
-(*Include even more rewriteC rules*)
-
-
-(*inductive f_con where
-id_con: "f_con (\<lambda>f. f)" |
-const_con: "f_con (\<lambda>f. g)" |
-let_con1: "f_con (\<lambda>f. Formula.Let na n f \<alpha>)"|
-let_con2: "f_con (\<lambda>f. Formula.Let na n \<alpha> f)"|
-neq_con: "f_con (\<lambda>f. Formula.Neg f)"|
-or_con1: "f_con (\<lambda>f. Formula.Or f \<alpha>)"|
-or_con2: "f_con (\<lambda>f. Formula.Or \<alpha> f)"|
-and_con1: "f_con (\<lambda>f. Formula.And f \<alpha>)"|
-and_con2: "f_con (\<lambda>f. Formula.And \<alpha> f)"|
-ands_con: "f_con (\<lambda>f. Formula.Ands  (a@[f]@b))"|
-exists_con: "f_con (\<lambda>f. Formula.Exists f)"|
-agg_con: "f_con (\<lambda>f. Formula.Agg n op n2 t f)"|
-prev_con: "f_con (\<lambda>f. Formula.Prev I f)"|
-next_con: "f_con (\<lambda>f. Formula.Next I f)"|
-since_con1: "f_con (\<lambda>f. Formula.Since f I \<alpha>)"|
-since_con2: "f_con (\<lambda>f. Formula.Since \<alpha> I f)"|
-until_con1: "f_con (\<lambda>f. Formula.Until f I \<alpha>)"|
-until_con2: "f_con (\<lambda>f. Formula.Until \<alpha> I f)"*)
-
-(*inductive f_con where
-or_con1: "f_con (\<lambda>f. Formula.Or f \<alpha>)"|
-or_con2: "f_con (\<lambda>f. Formula.Or \<alpha> f)"|
-and_con1: "f_con (\<lambda>f. Formula.And f \<alpha>)"|
-and_con2: "f_con (\<lambda>f. Formula.And \<alpha> f)"*)
-
+                                       rsat \<sigma> V v i (RAnd \<alpha> (RNext I (RAnd (RPrev I \<alpha>) \<beta>)))"sorry*)
 
   
-
-(*
-lemma subst_rsat2: "(rsat \<sigma> V v i \<alpha> = rsat \<sigma> V v i \<alpha>') \<Longrightarrow> 
-                    (rsat \<sigma> V v i \<beta> = rsat \<sigma> V v i \<beta>') \<Longrightarrow> rsat \<sigma> V v i (P \<alpha> \<beta>) = rsat \<sigma> V v i (P \<alpha>' \<beta>')" using subst_rsat 
-  by (metis remove_neg.simps(1) remove_neg.simps(3) sat.simps(6) subst_sat)
-
-lemma subst_rsat3: "rsat \<sigma> V v i \<alpha> = rsat \<sigma> V v i \<alpha>' \<Longrightarrow> 
-                    rsat \<sigma> V v i \<beta> = rsat \<sigma> V v i \<beta>' \<Longrightarrow>     
-                    rsat \<sigma> V v i \<gamma> = rsat \<sigma> V v i \<gamma>' \<Longrightarrow> rsat \<sigma> V v i (P \<alpha> \<beta> \<gamma>) = rsat \<sigma> V v i (P \<alpha>' \<beta>' \<gamma>')" using subst_rsat 
-  by (metis remove_neg.simps(1) remove_neg.simps(3) sat.simps(6) subst_sat)*)
-
 
 abbreviation finite_int where "finite_int I \<equiv> (right I) \<noteq> \<infinity>"
 
@@ -1394,259 +1037,17 @@ fun my_size :: "rformula \<Rightarrow> nat" where
 | "my_size (RSquareB I \<alpha>) = 1 + my_size \<alpha>"
 
 
-lemma shift_size: "my_size (shift \<alpha>) = my_size \<alpha>" sorry
+lemma shift_size: "my_size (shiftI_r 0 \<alpha>) = my_size \<alpha>" sorry
 
 lemma not_zero: "my_size \<alpha> > 0" by (induction \<alpha>;auto)
 
 
 
-
-
-(*lemma partition_cong[fundef_cong]:
-  "xs = ys \<Longrightarrow> (\<And>x. x\<in>set xs \<Longrightarrow> f x = g x) \<Longrightarrow> partition f xs = partition g ys"
-  by (induction xs arbitrary: ys) auto*)
-
 lemma rewrite1_conj[fundef_cong]: "(\<And>x. f x = g x) \<Longrightarrow> rewrite1 f \<alpha> = rewrite1 g \<alpha>" by presburger
 
-lemma project_cong[fundef_cong]: "f1 = f2 \<Longrightarrow> project f1 = project f2" by auto
-
-lemma sat_rewrite1: "(\<And>f. rsat \<sigma> V v i (re_fun f) = rsat \<sigma> V v i f) \<Longrightarrow>  
-                         rsat \<sigma> V v i (rewrite1 re_fun f2) = rsat \<sigma> V v i f2"
-proof(induction re_fun f2 rule:rewrite1.induct)
-  case (1 re_fun \<alpha> \<beta> \<gamma>)
-  then show ?case 
-  proof(cases "(prop_cond \<alpha> \<beta> \<or> prop_cond \<alpha> \<gamma>)")
-    case True
-    then show ?thesis 
-      apply(subst rewrite1.simps)
-      apply(simp only: project.simps Let_def split:if_splits)
-      apply(simp)
-     (* apply(simp only: 1[of "(formula.And \<alpha> \<beta>)"] 1[of "(formula.And \<alpha> \<gamma>)"])*)
-      apply auto
-      sorry
-  next
-    case False
-    then show ?thesis 
-      apply(subst rewrite1.simps)
-      apply(simp add: 1[of \<alpha>] 1[of \<beta>] 1[of \<gamma>]  split:if_splits)
-      sorry
-  qed
-qed auto
+lemma project_cong[fundef_cong]: "f1 = f2 \<Longrightarrow> project f1 = project f2" by auto  
 
 
-fun rewrite4 :: "(rformula \<Rightarrow> rformula) \<Rightarrow> rformula \<Rightarrow> rformula \<Rightarrow> rformula" where
-(*1*) "rewrite4 re_fun  \<alpha> (RExists \<beta>) = 
-       (if prop_cond \<alpha> \<beta>  
-        then RExists (re_fun (RAnd (shift \<alpha>) \<beta>))
-        else let \<alpha>' = re_fun \<alpha>; \<beta>' = re_fun \<beta> in RAnd \<alpha>' (RExists \<beta>'))"
-|      "rewrite4 re_fun \<alpha> f = RAnd \<alpha> f"
-
-lemma sat_r4: "(\<And>f v. rsat \<sigma> V v i (re_fun f) = rsat \<sigma> V v i f) \<Longrightarrow>  
-                         rsat \<sigma> V v i (rewrite4 re_fun f2 f3) = rsat \<sigma> V v i f2" sorry
-(*proof(induction re_fun f2 arbitrary: v rule:rewrite1.induct)
-  case (1 re_fun \<alpha> \<beta> \<gamma>)
-  then show ?case 
-  proof(cases "(prop_cond \<alpha> \<beta> \<or> prop_cond \<alpha> \<gamma>)")
-    case True
-    then show ?thesis sorry
-      (*apply(subst rewrite1.simps)
-      apply(simp add: 1[of "(formula.And \<alpha> \<beta>)"] 1[of "(formula.And \<alpha> \<gamma>)"]  split:if_splits)
-      apply auto
-      done*)
-  next
-    case False
-    then show ?thesis  sorry
-    (*  apply(subst rewrite1.simps)
-      apply(simp add: 1[of \<alpha>] 1[of \<beta>] 1[of \<gamma>]  split:if_splits)
-      done*)
-  qed
-next 
-  show ?thesis
-*)
-  
-
-(*function(sequential) rewrite :: "rformula \<Rightarrow> rformula" where
-"rewrite (RAnd f1 f2) = (let f' = (rewrite4 rewrite f1 f2) in if f' = RAnd f1 f2 then rewrite4 rewrite f2 f1 else f')"
-(*(*6,8*)| "rewrite (RSince l I r) = (
-             case (l,r) of
-              (RAnd \<alpha> \<gamma>,\<beta>) \<Rightarrow> (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I)
-                               then RSince (rewrite (RAnd \<alpha> \<gamma>)) I (rewrite (RAnd (RDiamondW I \<alpha>) \<beta>))
-                               else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in RSince (RAnd \<alpha>' \<gamma>') I \<beta>')
-             | (\<beta>,RAnd \<alpha> \<gamma>) \<Rightarrow> (if (prop_cond \<alpha> \<beta>)
-                                then RSince (rewrite (RAnd (RDiamondB I \<alpha>) \<beta>)) I (rewrite (RAnd \<alpha> \<gamma>))
-                                else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in RSince \<beta>' I (RAnd \<alpha>' \<gamma>'))
-             | _ \<Rightarrow> let l' = rewrite l; r' = rewrite r in RSince l' I r')"
-(*7,9*) | "rewrite (RUntil l I r) = (
-             case (l,r) of
-              (RAnd \<alpha> \<gamma>,\<beta>) \<Rightarrow>  (if (prop_cond \<alpha> \<beta>)
-                                then RUntil (rewrite (RAnd \<alpha> \<gamma>)) I (rewrite (RAnd (RDiamondB I \<alpha>) \<beta>))
-                                else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in RUntil (RAnd \<alpha>' \<gamma>') I \<beta>')
-             | (\<beta>,RAnd \<alpha> \<gamma>) \<Rightarrow> (if (prop_cond \<alpha> \<beta>)
-                                then RUntil (rewrite (RAnd (RDiamondW I \<alpha>) \<beta>)) I (rewrite (RAnd \<alpha> \<gamma>))
-                                else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in RUntil \<beta>' I (RAnd \<alpha>' \<gamma>'))
-             | _ \<Rightarrow> let l' = rewrite l; r' = rewrite r in RSince l' I r')"*)
-| "rewrite f = f"
-  by pat_completeness auto
-termination*)
-(*  case (1 \<alpha> \<beta> \<gamma>)
-  have con:"f_conr2 (\<lambda>f1 f2. ROr f1 f2)" by (rule f_conr2_1_t) 
-  from 1 show ?case 
-  proof(cases "prop_cond \<alpha> \<beta>")
-    case True
-    then show ?thesis 
-      apply(subst rewriteC.simps)
-    apply(simp only: Let_def simp_thms(7,15,16)  split:if_splits)
-    apply(simp only: subst_rsat2[OF con 1(1-2)[OF True]] )
-    apply(simp only: sat_rewriteC_1_e[symmetric])
-    done
-  next
-    case False
-    have con:"f_conr3 (\<lambda>f1 f2 f3. RAnd f1 (ROr f2 f3))" by (rule f_conr3_1_l)
-    from False show ?thesis 
-      apply(subst rewriteC.simps)
-      apply(simp only: Let_def simp_thms(8,15,16)  split:if_splits)
-      apply(simp only: subst_rsat3[OF con 1(3)[OF False] 1(4)[OF False refl] 1(5)[OF False refl refl]] )
-      done
-  qed*)
-
-
-(*function(sequential) rewrite where
-(*1*)  "rewrite (RAnd \<alpha> (ROr \<beta> \<gamma>)) =
-       (if prop_cond \<alpha> \<beta> \<and> prop_cond \<alpha> \<gamma>
-       then ROr (rewrite (RAnd \<alpha> \<beta>) ) (rewrite (RAnd \<alpha> \<gamma>) )
-       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta> ;  \<gamma>' = rewrite \<gamma>  in RAnd \<alpha>' (ROr \<beta>' \<gamma>'))" (*added prop_cond gamma because the rewrite shouldn't be position dependent*)
-(*(*1_2*)| "rewriteC (ROr \<beta> \<gamma>) \<alpha> =
-       (if prop_cond \<alpha> \<beta> \<and> prop_cond \<alpha> \<gamma>
-       then ROr (rewrite (RAnd \<alpha> \<beta>)) (rewrite (RAnd \<alpha> \<gamma>))
-       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in RAnd \<alpha>' (ROr \<beta>' \<gamma>'))"*)
-(*(*2*) | "rewrite (RAnd \<alpha> (RRelease \<beta> I \<gamma>)) =
-      (if prop_cond \<alpha> \<beta>
-       then RAnd (rewrite \<alpha> ) (RRelease (rewrite (RAnd \<beta> (RDiamondB (init_int I) \<alpha>)) ) I (rewrite (RAnd \<gamma> (RDiamondB I \<alpha>)) ))
-       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta> ;  \<gamma>' = rewrite \<gamma>  in (RAnd \<alpha>' (RRelease \<beta>' I \<gamma>')))"
-(*2_2*) | "rewriteC (RRelease \<beta> I \<gamma>) \<alpha> =
-      (if prop_cond \<alpha> \<beta>
-       then RAnd (rewrite \<alpha>) (RRelease (rewrite (RAnd \<beta> (RDiamondB (init_int I) \<alpha>))) I (rewrite (RAnd \<gamma> (RDiamondB I \<alpha>))))
-       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in (RAnd \<alpha>' (RRelease \<beta>' I \<gamma>')))"*)
-(*3*) | "rewrite (RAnd \<alpha> (RTrigger \<beta> I \<gamma>)) =
-      (if prop_cond \<alpha> \<beta>
-       then RAnd (rewrite \<alpha> ) (RTrigger (rewrite (RAnd \<beta> (RDiamondW (init_int I) \<alpha>)) ) I (rewrite (RAnd \<gamma> (RDiamondW I \<alpha>)) ))
-       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta> ;  \<gamma>' = rewrite \<gamma>  in (RAnd \<alpha>' (RTrigger \<beta>' I \<gamma>')))"
-  (*(*3_2*) | "rewrite (RAnd (RTrigger \<beta> I \<gamma>) \<alpha>) =
-      (if prop_cond \<alpha> \<beta>
-       then RAnd (rewrite \<alpha>) (RTrigger (rewrite (RAnd \<beta> (RDiamondW (init_int I) \<alpha>))) I (rewrite (RAnd \<gamma> (RDiamondW I \<alpha>))))
-       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in (RAnd \<alpha>' (RTrigger \<beta>' I \<gamma>')))"*)
-(*4*) | "rewrite (RAnd \<alpha> (RExists \<beta>)) = 
-       (if prop_cond \<alpha> \<beta>  
-        then RExists (rewrite (RAnd (shift \<alpha>) \<beta>) )
-        else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta>  in RAnd \<alpha>' (RExists \<beta>'))"
-(*(*4_2*) | "rewrite (RAnd (RExists \<beta>) \<alpha>) = 
-       (if prop_cond \<alpha> \<beta>  
-        then RExists (rewrite (RAnd (shift \<alpha>) \<beta>))
-        else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in RAnd \<alpha>' (RExists \<beta>'))"*)
-(*5*) | "rewrite (RAnd \<alpha> (RNeg \<beta>)) =
-      (if prop_cond \<alpha> \<beta>  
-       then RAnd (rewrite \<alpha> ) ((RNeg (rewrite (RAnd \<alpha> \<beta>) )))  
-       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta>  in RAnd \<alpha>' (RNeg \<beta>'))"
-(*(*5_2*) | "rewrite (RAnd (RNeg \<beta>) \<alpha>) =
-      (if prop_cond \<alpha> \<beta>  
-       then RAnd (rewrite \<alpha>) ((RNeg (rewrite (RAnd \<alpha> \<beta>))))  
-       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in RAnd \<alpha>' (RNeg \<beta>'))"*)
-(*10,12*) | "rewrite (RAnd \<alpha> (RSince \<beta> I \<gamma>)) =
-      (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I) then RAnd (rewrite \<alpha> ) (RSince (rewrite (RAnd (RDiamondW (init_int I) \<alpha>) \<beta>) ) I (rewrite \<gamma> ))
-       else if (prop_cond \<alpha> \<gamma>) \<and> (finite_int I) then RAnd (rewrite \<alpha> ) (RSince (rewrite \<beta> ) I (rewrite (RAnd (RDiamondW I \<alpha>) \<gamma>) ))
-       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta> ;  \<gamma>' = rewrite \<gamma>  in RAnd \<alpha>' (RSince \<beta>' I \<gamma>'))"
-(*(*10_2,12_2*) | "rewrite (RAnd (RSince \<beta> I \<gamma>) \<alpha>) =
-      (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I) then RAnd (rewrite \<alpha>) (RSince (rewrite (RAnd (RDiamondW (init_int I) \<alpha>) \<beta>)) I (rewrite \<gamma>))
-       else if (prop_cond \<alpha> \<gamma>) \<and> (finite_int I) then RAnd (rewrite \<alpha>) (RSince (rewrite \<beta>) I (rewrite (RAnd (RDiamondW I \<alpha>) \<gamma>)))
-       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in RAnd \<alpha>' (RSince \<beta>' I \<gamma>'))"*)
-(*11,13*) | "rewrite (RAnd \<alpha> (RUntil \<beta> I \<gamma>)) =
-      (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I) then RAnd (rewrite \<alpha> ) (RUntil (rewrite (RAnd (RDiamondB (init_int I) \<alpha>) \<beta>) ) I (rewrite \<gamma> ))
-       else if (prop_cond \<alpha> \<gamma>) \<and> (finite_int I) then RAnd (rewrite \<alpha> ) (RUntil (rewrite \<beta> ) I (rewrite (RAnd (RDiamondB I \<alpha>) \<gamma>) ))
-       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta> ;  \<gamma>' = rewrite \<gamma>  in RAnd \<alpha>' (RUntil \<beta>' I \<gamma>'))"
-(*(*11_2,13_2*) | "rewrite (RAnd (RUntil \<beta> I \<gamma>) \<alpha>) =
-      (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I) then RAnd (rewrite \<alpha>) (RUntil (rewrite (RAnd (RDiamondB (init_int I) \<alpha>) \<beta>)) I (rewrite \<gamma>))
-       else if (prop_cond \<alpha> \<gamma>) \<and> (finite_int I) then RAnd (rewrite \<alpha>) (RUntil (rewrite \<beta>) I (rewrite (RAnd (RDiamondB I \<alpha>) \<gamma>)))
-       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta>;  \<gamma>' = rewrite \<gamma> in RAnd \<alpha>' (RUntil \<beta>' I \<gamma>'))"*)
-(*18*) | "rewrite (RAnd \<alpha> (RDiamondB I \<beta>)) =
-      (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I)
-       then RAnd (rewrite \<alpha> ) (RDiamondB I (RAnd (RDiamondW I (rewrite \<alpha> )) (rewrite \<beta> )))
-       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta>  in RAnd \<alpha>' (RDiamondB I \<beta>'))"
-(*(*18_2*) | "rewrite (RAnd (RDiamondB I \<beta>) \<alpha>) =
-      (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I)
-       then RAnd (rewrite \<alpha>) (RDiamondB I (RAnd (RDiamondW I (rewrite \<alpha>)) (rewrite \<beta>)))
-       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in RAnd \<alpha>' (RDiamondB I \<beta>'))"*)
-(*19*) | "rewrite (RAnd \<alpha> (RDiamondW I \<beta>)) =
-      (if (prop_cond \<alpha> \<beta>)
-       then RAnd (rewrite \<alpha> ) (RDiamondW I (RAnd (RDiamondB I (rewrite \<alpha> )) (rewrite \<beta> )))
-       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta>  in RAnd \<alpha>' (RDiamondW I \<beta>'))"
-(*(*19_2*) | "rewrite (RAnd (RDiamondW I \<beta>) \<alpha>) =
-      (if (prop_cond \<alpha> \<beta>)
-       then RAnd (rewrite \<alpha>) (RDiamondW I (RAnd (RDiamondB I (rewrite \<alpha>)) (rewrite \<beta>)))
-       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in RAnd \<alpha>' (RDiamondW I \<beta>'))"*)
- (*20*) | "rewrite (RAnd \<alpha> (RSquareB I \<beta>)) =
-      (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I)
-       then RAnd (rewrite \<alpha> ) (RSquareB I (RAnd (RDiamondW I (rewrite \<alpha> )) (rewrite \<beta> )))
-       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta>  in RAnd \<alpha>' (RSquareB I \<beta>'))" (*some of these rules don't rewrite the conjunction, of diamond/square, because it doesn't increase rr of the conjunction more than recursing the leaves*)
-(*(*20_2*) | "rewrite (RAnd (RSquareB I \<beta>) \<alpha>) =
-      (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I)
-       then RAnd (rewrite \<alpha>) (RSquareB I (RAnd (RDiamondW I (rewrite \<alpha>)) (rewrite \<beta>)))
-       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in RAnd \<alpha>' (RSquareB I \<beta>'))"*)
- (*21*) | "rewrite (RAnd \<alpha> (RSquareW I \<beta>)) =
-      (if (prop_cond \<alpha> \<beta>)
-       then RAnd (rewrite \<alpha> ) (RSquareW I (RAnd (RDiamondB I (rewrite \<alpha> )) (rewrite \<beta> )))
-       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta>  in RAnd \<alpha>' (RSquareW I \<beta>'))"
-(* (*21_2*) | "rewrite (RAnd (RSquareW I \<beta>) \<alpha>) =
-      (if (prop_cond \<alpha> \<beta>)
-       then RAnd (rewrite \<alpha>) (RSquareW I (RAnd (RDiamondB I (rewrite \<alpha>)) (rewrite \<beta>)))
-       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in RAnd \<alpha>' (RSquareW I \<beta>'))"*)
- (*22*) | "rewrite (RAnd \<alpha> (RPrev I \<beta>)) =
-      (if (prop_cond \<alpha> \<beta>)
-       then RAnd (rewrite \<alpha> ) (RPrev I (RAnd (RNext I (rewrite \<alpha> )) (rewrite \<beta> )))
-       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta>  in RAnd \<alpha>' (RPrev I \<beta>'))"
-(*(*22_2*) | "rewrite (RAnd (RPrev I \<beta>) \<alpha>) =
-      (if (prop_cond \<alpha> \<beta>)
-       then RAnd (rewrite \<alpha>) (RPrev I (RAnd (RNext I (rewrite \<alpha>)) (rewrite \<beta>)))
-       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in RAnd \<alpha>' (RPrev I \<beta>'))"*)
-(*23*) | "rewrite (RAnd \<alpha> (RNext I \<beta>)) =
-      (if (prop_cond \<alpha> \<beta>)
-       then RAnd (rewrite \<alpha> ) (RNext I (RAnd (RPrev I (rewrite \<alpha> )) (rewrite \<beta> )))
-       else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta>  in (RAnd \<alpha>' (RNext I \<beta>')))"
-(*(*23_2*) | "rewrite (RAnd (RNext I \<beta>) \<alpha>) =
-      (if (prop_cond \<alpha> \<beta>)
-       then RAnd (rewrite \<alpha>) (RNext I (RAnd (RPrev I (rewrite \<alpha>)) (rewrite \<beta>)))
-       else let \<alpha>' = rewrite \<alpha>; \<beta>' = rewrite \<beta> in (RAnd \<alpha>' (RNext I \<beta>')))"*)
-
-(*6,8*)| "rewrite (RSince (RAnd \<alpha> \<gamma>) I \<beta>) =  (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I)
-                               then RSince (rewrite (RAnd \<alpha> \<gamma>) ) I (rewrite (RAnd (RDiamondW I \<alpha>) \<beta>) )
-                               else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta> ;  \<gamma>' = rewrite \<gamma>  in RSince (RAnd \<alpha>' \<gamma>') I \<beta>')"
-(*|"rewrite (RSince \<beta> I (RAnd \<alpha> \<gamma>)) = (if (prop_cond \<alpha> \<beta>)
-                                then RSince (rewrite (RAnd (RDiamondB I \<alpha>) \<beta>) ) I (rewrite (RAnd \<alpha> \<gamma>) )
-                                else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta> ;  \<gamma>' = rewrite \<gamma>  in RSince \<beta>' I (RAnd \<alpha>' \<gamma>'))"*)
-
-(*(*7,9*) | "rewrite (RUntil (RAnd \<alpha> \<gamma>) I \<beta>) = (if (prop_cond \<alpha> \<beta>)
-                                then RUntil (rewrite (RAnd \<alpha> \<gamma>) ) I (rewrite (RAnd (RDiamondB I \<alpha>) \<beta>) )
-                                else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta> ;  \<gamma>' = rewrite \<gamma>  in RUntil (RAnd \<alpha>' \<gamma>') I \<beta>')"
-| "rewrite (RUntil \<beta> I (RAnd \<alpha> \<gamma>)) =(if (prop_cond \<alpha> \<beta>)
-                                then RUntil (rewrite (RAnd (RDiamondW I \<alpha>) \<beta>) ) I (rewrite (RAnd \<alpha> \<gamma>) )
-                                else let \<alpha>' = rewrite \<alpha> ; \<beta>' = rewrite \<beta> ;  \<gamma>' = rewrite \<gamma>  in RUntil \<beta>' I (RAnd \<alpha>' \<gamma>'))"*)
-
-| "rewrite f = f"
-
-  by pat_completeness auto
-termination 
-  apply(relation "measure (\<lambda>f t. (my_size f) + (size_tries t)")
-  apply (auto simp add: shift_size not_zero) (*not_zero important because size of constructor then depends on its' number of arguments*)
-  done
-lemma size_r: "\<And>r::rformula. m r > 0" sorry*)
-
-
-
-(*  by pat_completeness auto
-termination 
-  apply(relation "measure my_size")
-  apply (auto simp add: shift_size not_zero) (*not_zero important because size of constructor then depends on its' number of arguments*)
-  done
-lemma size_r: "\<And>r::rformula. m r > 0" sorry*)
 
 
 
@@ -1668,7 +1069,7 @@ function(sequential) rewrite where
 
 (*4*) | "rewrite (RAnd \<alpha> (RExists \<beta>)) t = 
        (if prop_cond \<alpha> \<beta>  
-        then RExists (rewrite (RAnd (shift \<alpha>) \<beta>) Same)
+        then RExists (rewrite (RAnd (shiftI_r 0 \<alpha>) \<beta>) Same)
         else let \<alpha>' = rewrite \<alpha> Same; \<beta>' = rewrite \<beta> Same in RAnd \<alpha>' (RExists \<beta>'))"
 
 (*5*) | "rewrite (RAnd \<alpha> (RNeg \<beta>)) t =
@@ -1842,7 +1243,22 @@ lemma trans1: "trans P P' \<Longrightarrow> f_conr P \<and> f_con P' "
   using f_con.simps f_conr.simps trans.simps by auto
 
 lemma trans2: "trans P P' \<Longrightarrow> project (P r) = P' (project r)" 
-  by (induction P P' rule:trans.induct;simp)
+proof(induction P P' rule:trans.induct)
+  case trans1
+  then show ?case sorry
+next
+  case (trans2 I)
+  then show ?case sorry
+next
+  case (trans3 I)
+  then show ?case sorry
+next
+  case (trans4 I)
+  then show ?case sorry
+next
+  case (trans5 I)
+  then show ?case sorry
+qed
 
 lemma trans3: "f_conr P \<Longrightarrow> \<exists>P'. trans P P'" 
   using f_conr.simps trans.trans1 trans.trans2 trans3 trans4 trans5 by force
@@ -1881,7 +1297,7 @@ lemma trans2_1: "trans2 P P' \<Longrightarrow> f_conr2 P \<and> f_con2 P' "
   using f_con2.simps f_conr2.simps trans2.simps by auto
 
 lemma trans2_2: "trans2 P P' \<Longrightarrow> project (P r r2) = P' (project r) (project r2)" 
-  by (induction P P' rule:trans2.induct;simp)
+  sorry (* (induction P P' rule:trans2.induct;simp)*)
 
 lemma trans2_3: "f_conr2 P \<Longrightarrow> \<exists>P'. trans2 P P'" 
   apply(induction P rule:f_conr2.induct)
@@ -1907,7 +1323,7 @@ qed
  
   
 
-
+(*
 function(sequential) rewriteC :: "Formula.formula \<Rightarrow> Formula.formula" where
 (*1*)  "rewriteC (Formula.And \<alpha> (Formula.Or \<beta> \<gamma>)) = (let \<alpha>' = rewriteC \<alpha>;
                                                     \<beta>' = rewriteC \<beta>;
@@ -2030,20 +1446,11 @@ function(sequential) rewriteC :: "Formula.formula \<Rightarrow> Formula.formula"
 | "rewriteC f = f "
   by pat_completeness auto
 termination by lexicographic_order
+*)
 
 
-(*fun_cases my_elim: "rewriteC \<alpha>"*)
 
-thm formula.splits
 
-lemma rewriteC_sat: "Formula.sat \<sigma> V v i (rewriteC \<alpha>) = Formula.sat \<sigma> V v i \<alpha>" 
-proof(induction \<alpha> arbitrary: v i rule:rewriteC.induct)
-  case (1 \<alpha> \<beta> \<gamma>) (*1*)
-  then show ?case  by (simp del:sat.simps add:Let_def sat_rewriteC_1;auto)
-next
-  case (2 \<alpha> \<beta>)  (*4*)
-  then show ?case by(simp only: rewriteC.simps shiftI.simps sat_rewriteC_4[symmetric] Let_def split:if_splits;simp) 
-next
 (*
   case (3)
   then show ?case by (simp only:rewriteC.simps Let_def sat_rewriteC_21[symmetric] split:if_splits;simp)
@@ -2118,15 +1525,6 @@ next
   case (13) (*23*)
   then show ?case by (simp only:rewriteC.simps Let_def sat_rewriteC_23[symmetric] split:if_splits;simp)
 *)
-qed auto
-
-
-
-(*5*)| "rewriteC (Formula.And \<alpha> (Formula.Neg \<beta>)) =(let \<alpha>' = rewriteC \<alpha>;
-                                                      \<beta>' = rewriteC \<beta>
-                                                in if prop_cond \<alpha>' \<beta>'  
-                                                 then Formula.And \<alpha>' (Formula.Neg (Formula.And \<alpha>' \<beta>'))  
-                                                 else Formula.And \<alpha>' (Formula.Neg \<beta>'))"
 
 
 
