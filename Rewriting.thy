@@ -908,65 +908,6 @@ qed auto
 
 
 
-(*lemma   sat_rewriteC_1_e:
-  "rsat \<sigma> V v i (RAnd \<alpha> (ROr \<beta> \<gamma>)) =
-   rsat \<sigma> V v i (ROr (RAnd \<alpha> \<beta>) (RAnd \<alpha> \<gamma>))" sorry
-
-lemma sat_rewriteC_2_e: "rsat \<sigma> V v i (RAnd \<alpha> (RRelease \<beta> I \<gamma>)) =
-                                      rsat \<sigma> V v i (RAnd \<alpha> (RRelease (RAnd \<beta> (RDiamondB (init_int I) \<alpha>)) I (RAnd \<gamma> (RDiamondB I \<alpha>))))" sorry
-
-lemma sat_rewriteC_3_e: "rsat \<sigma> V v i (RAnd \<alpha> (RTrigger \<beta> I \<gamma>)) =
-                                      rsat \<sigma> V v i (RAnd \<alpha> (RTrigger (RAnd \<beta> (RDiamondW (init_int I) \<alpha>)) I (RAnd \<gamma> (RDiamondW I \<alpha>))))" sorry
-
-lemma sat_rewriteC_4_e: "rsat \<sigma> V v i (RAnd \<alpha> (RExists \<beta>)) = 
-                    rsat \<sigma> V v i (RExists (RAnd (shift \<alpha>) \<beta> ))" sorry
-
-lemma sat_rewriteC_5_e: "rsat \<sigma> V v i (RAnd \<alpha> (RNeg \<beta>))  =
-                      rsat \<sigma> V v i (RAnd \<alpha> (RNeg (RAnd \<alpha> \<beta>)))" sorry
-
-lemma sat_rewriteC_6_e: "excl_zero I \<Longrightarrow> rsat \<sigma> V v i (RSince (RAnd \<alpha> \<gamma>) I \<beta> ) =
-                                      rsat \<sigma> V v i (RSince (RAnd \<alpha> \<gamma>) I (RAnd (RDiamondW I \<alpha>) \<beta>))" sorry
-
-lemma sat_rewriteC_7_e: "excl_zero I \<Longrightarrow> rsat \<sigma> V v i (RUntil (RAnd \<alpha> \<gamma>) I \<beta> ) =
-                                        rsat \<sigma> V v i (RUntil (RAnd \<alpha> \<gamma>) I (RAnd (RDiamondB I \<alpha>) \<beta>))" sorry
-
-lemma sat_rewriteC_8_e: "rsat \<sigma> V v i (RSince \<beta> I (RAnd \<alpha> \<gamma>) ) =
-                      rsat \<sigma> V v i (RSince (RAnd (RDiamondB (init_int I) \<alpha>) \<beta>) I (RAnd \<alpha> \<gamma>))" sorry
-
-lemma sat_rewriteC_9_e: "rsat \<sigma> V v i (RUntil \<beta> I (RAnd \<alpha> \<gamma>)) =
-                                      rsat \<sigma> V v i (RUntil (RAnd (RDiamondW (init_int I) \<alpha>) \<beta>) I (RAnd \<alpha> \<gamma>))" sorry
-
-lemma sat_rewriteC_10_e: "rsat \<sigma> V v i (RAnd \<alpha> (RSince \<beta> I \<gamma>)) =
-                       rsat \<sigma> V v i (RAnd \<alpha> (RSince (RAnd (RDiamondW (init_int I) \<alpha>) \<beta>) I \<gamma>))" sorry
-
-lemma sat_rewriteC_11_e: "rsat \<sigma> V v i (RAnd \<alpha> (RUntil \<beta> I \<gamma>)) =
-                                       rsat \<sigma> V v i (RAnd \<alpha> (RUntil (RAnd (RDiamondB (init_int I) \<alpha>) \<beta>) I \<gamma>))" sorry
-lemma sat_rewriteC_12_e: "rsat \<sigma> V v i (RAnd \<alpha> (RSince \<gamma> I \<beta>)) =
-                                       rsat \<sigma> V v i (RAnd \<alpha> (RSince \<gamma> I (RAnd (RDiamondW I \<alpha>)\<beta>)))" sorry
-
-lemma sat_rewriteC_13_e: "rsat \<sigma> V v i (RAnd \<alpha> (RUntil \<gamma> I \<beta>)) =
-                                       rsat \<sigma> V v i (RAnd \<alpha> (RUntil \<gamma> I (RAnd (RDiamondB I \<alpha>)\<beta>)))" sorry
-
-lemma sat_rewriteC_18_e: "rsat \<sigma> V v i (RAnd \<alpha> (RDiamondB I \<beta>)) = 
-                                       rsat \<sigma> V v i (RAnd \<alpha> (RDiamondB I (RAnd (RDiamondW I \<alpha> ) \<beta>)))" sorry
-
-lemma sat_rewriteC_19_e: "rsat \<sigma> V v i (RAnd \<alpha> (RDiamondW I \<beta>)) = 
-                                       rsat \<sigma> V v i (RAnd \<alpha> (RDiamondW I (RAnd (RDiamondB I \<alpha> ) \<beta>)))" sorry
-
-lemma sat_rewriteC_20_e: "rsat \<sigma> V v i (RAnd \<alpha> (RSquareB I \<beta>)) = 
-                                       rsat \<sigma> V v i (RAnd \<alpha> (RSquareB I (RAnd (RDiamondW I \<alpha> ) \<beta>)))" sorry
-
-lemma sat_rewriteC_21_e: "rsat \<sigma> V v i (RAnd \<alpha> (RSquareW I \<beta>)) = 
-                                       rsat \<sigma> V v i (RAnd \<alpha> (RSquareW I (RAnd (RDiamondB I \<alpha> ) \<beta>)))" sorry
-
-lemma sat_rewriteC_22_e: "rsat \<sigma> V v i (RAnd \<alpha> (RPrev I \<beta>)) = 
-                                       rsat \<sigma> V v i (RAnd \<alpha> (RPrev I (RAnd (RNext I \<alpha>) \<beta>)))"  sorry
-
-lemma sat_rewriteC_23_e: "rsat \<sigma> V v i (RAnd \<alpha> (RNext I \<beta>)) = 
-                                       rsat \<sigma> V v i (RAnd \<alpha> (RNext I (RAnd (RPrev I \<alpha>) \<beta>)))"sorry*)
-
-  
-
 abbreviation finite_int where "finite_int I \<equiv> (right I) \<noteq> \<infinity>"
 
 
@@ -1033,9 +974,32 @@ fun my_size :: "rformula \<Rightarrow> nat" where
 | "my_size (RSquareW I \<alpha>) =1 + my_size \<alpha>"
 | "my_size (RSquareB I \<alpha>) = 1 + my_size \<alpha>"
 
-lemma shift_size: "my_size (shiftI_r 0 \<alpha>) = my_size \<alpha>" 
-  apply(induction \<alpha>;auto)
-  sorry
+lemma shift_size: "my_size (shiftI_r b \<alpha>) = my_size \<alpha>" 
+proof(induction \<alpha> arbitrary: b)
+case (RNeg \<alpha>)
+  then show ?case sorry
+next
+  case (RAnds x)
+  then show ?case sorry
+next
+case (RSince \<alpha>1 x2 \<alpha>2)
+  then show ?case sorry
+next
+  case (RUntil \<alpha>1 x2 \<alpha>2)
+  then show ?case sorry
+next
+  case (RRelease \<alpha>1 x2 \<alpha>2)
+  then show ?case sorry
+next
+  case (RTrigger \<alpha>1 x2 \<alpha>2)
+then show ?case sorry
+next
+  case (RMatchF I r)
+then show ?case by (induction r;auto)
+next
+  case (RMatchP I r)
+  then show ?case by (induction r;auto)
+qed auto
 
 lemma not_zero: "my_size \<alpha> > 0" by (induction \<alpha>;auto)
 
