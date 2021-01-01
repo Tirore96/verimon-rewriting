@@ -168,10 +168,11 @@ fun project1 :: "tformula \<Rightarrow> Formula.formula" where
 
 
 
-lemma project_embed1: "(project1 \<circ> embed1) f = f" 
+lemma project_embed1: "project1 (embed1 f) = f" 
 proof(induction f rule:embed1.induct)
-case (1 \<phi>s)
-then show ?case sorry
+  case (1 \<phi>s)
+  then have "map (project1 \<circ> embed1) \<phi>s = map id \<phi>s" using map_cong[OF refl, of \<phi>s "project1 \<circ> embed1" id ] by simp (*reduce function argument to identity*)
+  then show ?case by simp
 next
   case (2 I r)
   then show ?case by (induction r;auto)
@@ -190,7 +191,8 @@ abbreviation project where
 lemma project_embed2: "project2 (embed2 r) = r"
 proof(induction r rule:embed2.induct)
   case (1 \<phi>s)
-  then show ?case sorry
+  then have "map (project2 \<circ> embed2) \<phi>s = map id \<phi>s" using map_cong[OF refl, of \<phi>s "project2 \<circ> embed2" id ] by simp (*reduce function argument to identity*)
+  then show ?case by simp
 next
   case (2 I r)
   then show ?case by (induction r;auto)
@@ -202,6 +204,79 @@ qed auto
 
 lemma project_embed[simp]: "project (embed f) = f"
   using   project_embed1 project_embed2 by auto
+
+lemma embed_project1: "embed1 (project1 r) = r" 
+proof(induct r rule:project1.induct)
+case (1 r ts)
+then show ?case by auto
+next
+  case (2 p b \<phi> \<psi>)
+  then show ?case by auto
+next
+case (3 t1 t2)
+then show ?case by auto
+next
+case (4 t1 t2)
+then show ?case by auto
+next
+  case (5 t1 t2)
+  then show ?case by auto
+next
+  case (6 I \<psi>)
+  then show ?case by auto
+next
+  case (7 I \<psi>)
+  then show ?case by auto
+next
+  case (8 \<phi>)
+then show ?case sorry
+next
+  case (9 \<phi> \<psi>)
+  then show ?case by auto
+next
+  case (10 \<phi> \<psi>)
+  then show ?case by auto
+next
+  case (11 \<phi>s)
+  then show ?case sorry
+next
+  case (12 \<phi>)
+then show ?case by auto
+next
+  case (13 y \<omega> b' f \<phi>)
+  then show ?case by auto
+next
+  case (14 I \<phi>)
+  then show ?case by auto
+next
+  case (15 I \<phi>)
+  then show ?case by auto
+next
+  case (16 I \<phi>)
+  then show ?case by auto
+next
+  case (17 \<phi> I \<psi>)
+  then show ?case sorry
+next
+  case (18 I \<phi>)
+  then show ?case by auto
+next
+  case (19 \<phi> I \<psi>)
+  then show ?case sorry
+next
+  case (20 I r)
+  then show ?case by (induction r; auto)
+next
+  case (21 I r)
+  then show ?case by (induction r; auto)
+qed 
+
+
+lemma embed_project2: "embed2 (project2 r) = r" sorry
+lemma embed_project[simp]: "embed (project r) = r" 
+  using   embed_project1 embed_project2 by auto
+
+
 
 definition   "rsat \<sigma> V v i \<phi> \<equiv> Formula.sat \<sigma> V v i (project \<phi>)"
 
@@ -451,9 +526,79 @@ primrec shiftI :: "nat \<Rightarrow> Formula.formula \<Rightarrow> Formula.formu
 
 abbreviation shift where "shift \<equiv> shiftI 0"
 
-abbreviation shiftI_r where
-"shiftI_r b r \<equiv> embed (shiftI b (project r))"
+primrec shiftI_r :: "nat \<Rightarrow> rformula \<Rightarrow> rformula" where
+  "shiftI_r k (RPred r ts) = RPred r (map (shiftTI k) ts)"
+| "shiftI_r k (RExists a) = RExists (shiftI_r (Suc k) a)"
+| "shiftI_r k (RLet nm n a b) = RLet nm n a (shiftI_r k b)" (*fixed error, a is not shifted*)
+| "shiftI_r k (REq t1 t2) = REq (shiftTI k t1) (shiftTI k t2)"
+| "shiftI_r k (RLess t1 t2) =  RLess (shiftTI k t1) (shiftTI k t2)"
+| "shiftI_r k (RLessEq t1 t2) = RLessEq (shiftTI k t1) (shiftTI k t2)"
+| "shiftI_r k (RNeg a) = RNeg (shiftI_r k a)"
+| "shiftI_r k (ROr a b) = ROr (shiftI_r k a) (shiftI_r k b)"
+| "shiftI_r k (RAnd a b) = RAnd (shiftI_r k a) (shiftI_r k b)"
+| "shiftI_r k (RAnds as) = RAnds (map (shiftI_r k) as)"  
+| "shiftI_r k (RAgg y op b t a) = RAgg (if y < k then y else y + 1)
+                                            op b (shiftTI (k + b) t) (shiftI_r (k + b) a)"
+| "shiftI_r k (RPrev \<I> a) = RPrev \<I> (shiftI_r k a)"
+| "shiftI_r k (RNext \<I> a) = RNext \<I> (shiftI_r k a)"
+| "shiftI_r k (RSince a1 \<I> a2) = RSince (shiftI_r k a1) \<I> (shiftI_r k a2)"
+| "shiftI_r k (RUntil a1 \<I> a2) = RUntil (shiftI_r k a1) \<I> (shiftI_r k a2)"
+| "shiftI_r k (RRelease a1 \<I> a2) = RRelease (shiftI_r k a1) \<I> (shiftI_r k a2)"
+| "shiftI_r k (RTrigger a1 \<I> a2) = RTrigger (shiftI_r k a1) \<I> (shiftI_r k a2)"
+| "shiftI_r k (RDiamondW \<I> a2) = RDiamondW \<I> (shiftI_r k a2)"
+| "shiftI_r k (RDiamondB \<I> a2) = RDiamondB \<I> (shiftI_r k a2)"
+| "shiftI_r k (RSquareB \<I> a2) = RSquareB \<I> (shiftI_r k a2)"
+| "shiftI_r k (RSquareW \<I> a2) = RSquareW \<I> (shiftI_r k a2)"
 
+| "shiftI_r k (RMatchF \<I> r) = RMatchF \<I> (Regex.map_regex (shiftI_r k) r)"
+| "shiftI_r k (RMatchP \<I> r) = RMatchP \<I> (Regex.map_regex (shiftI_r k) r)"
+
+
+(*abbreviation shiftI_r where
+"shiftI_r b r \<equiv> embed (shiftI b (project r))"*)
+
+lemma shift_eq_embed: "shiftI_r b r = embed (shiftI b (project r))"
+proof(induct r arbitrary: b)
+case (RLet x1 x2 r1 r2)
+  then show ?case by simp (*uses embed_project*)
+next
+  case (RNeg r)
+  moreover have "RNeg (Rewriting.embed (shiftI b (project r))) = (Rewriting.embed (Formula.Neg (shiftI b (project r))))" (*challenge is moving negation inside embed call*)
+    by (metis embed_project project1.simps(8) project2.simps(8) project_embed)
+  ultimately show ?case by simp
+next
+  case (RSince r1 x2 r2)
+then show ?case 
+  by (metis embed_project project1.simps(17) project2.simps(16) project_embed shiftI.simps(14) shiftI_r.simps(14))
+next
+  case (RUntil r1 x2 r2)
+  then show ?case 
+    by (metis embed_project project1.simps(19) project2.simps(17) project_embed shiftI.simps(15) shiftI_r.simps(15))
+next
+  case (RRelease r1 x2 r2)
+  then show ?case sledgehammer
+    (*by (metis embed_project1 embed_project2 project1.simps(19) project1.simps(8) project2.simps(2) project_embed shiftI.simps(15) shiftI.simps(7) shiftI_r.simps(16))*)
+  proof(cases "formula.Neg (shiftI b (project r1)) = TT")
+    case True
+    then show ?thesis using RRelease by auto
+  next
+    case False
+    then show ?thesis using RRelease by (metis embed_project project1.simps(19) project1.simps(8) project2.simps(2) project_embed1 project_embed2 shiftI.simps(15) shiftI.simps(7) shiftI_r.simps(16))
+  qed
+next
+  case (RTrigger r1 x2 r2)
+  then show ?case 
+    by (metis embed_project project1.simps(17) project1.simps(8) project2.simps(1) project_embed1 project_embed2 shiftI.simps(14) shiftI.simps(7) shiftI_r.simps(17))
+next
+case (RMatchF I r)
+  then show ?case by (induction r;auto)
+next
+  case (RMatchP I r)
+then show ?case by (induction r;auto)
+qed auto
+
+lemma shift_eq_project: "project (shiftI_r b (embed f)) = shiftI b f" 
+  by (simp add: shift_eq_embed)
 
 
 lemma shift_fv_in_f: "(x+1) \<in> (Formula.fvi b (shiftI b \<phi>)) \<longleftrightarrow> x \<in> (Formula.fvi b \<phi>)"
@@ -947,6 +1092,36 @@ lemma my_size_list_cong[fundef_cong]:
   "fs = fs' \<Longrightarrow> (\<And>z. z \<in> set fs \<Longrightarrow> fun z = fun' z) \<Longrightarrow> my_size_list fun fs = my_size_list fun' fs'" 
   by (induct fs arbitrary: fs') auto
 
+(*fun my_size :: "Formula.formula \<Rightarrow> nat" where
+  "my_size (Formula.Pred r ts) = 1"
+| "my_size (Formula.Let p _ \<phi> \<psi>) = 1"
+| "my_size  (Formula.Eq t1 t2) = 1"
+
+| "my_size (Formula.Less t1 t2) = 1"
+| "my_size (Formula.LessEq t1 t2) = 1"
+| "my_size (Formula.Or \<phi> \<psi>) =  1 + (my_size \<phi>) + (my_size \<psi>)"
+| "my_size (Formula.And \<phi> \<psi>) = 1 + (my_size \<phi>) + (my_size \<psi>)"
+| "my_size (Formula.Ands \<phi>s) = 1+ my_size_list my_size \<phi>s"
+
+| "my_size (Formula.Exists \<phi>) = 1 + my_size \<phi>"
+| "my_size (Formula.Agg y \<omega> b' f \<phi>) = 1 + (my_size \<phi>)"
+| "my_size (Formula.Prev I \<phi>) = 1+ my_size \<phi>"
+| "my_size (Formula.Next I \<phi>) = 1+ my_size \<phi>"
+
+| "my_size (Formula.Neg (Formula.Since TT I (Formula.Neg \<alpha>))) =1 + my_size \<alpha>"
+| "my_size (Formula.Since TT I \<alpha>) =1 + my_size \<alpha>"
+| "my_size (Formula.Since (Formula.Neg \<phi>) I (Formula.Neg \<psi>)) =  1+ (my_size \<phi>) + (my_size \<psi>)"
+| "my_size (Formula.Since \<phi> I \<psi>) = 1+ (my_size \<phi>) + (my_size \<psi>)"
+
+| "my_size (Formula.Neg (Formula.Until TT I (Formula.Neg \<alpha>))) =1 + my_size \<alpha>"
+| "my_size (Formula.Until TT I \<alpha>) = 1 + my_size \<alpha>"
+| "my_size (Formula.Until (Formula.Neg \<phi>) I (Formula.Neg \<psi>)) = 1+ (my_size \<phi>) + (my_size \<psi>)"
+| "my_size (Formula.Until \<phi> I \<psi>) =  1+ (my_size \<phi>) + (my_size \<psi>)"
+
+| "my_size (Formula.MatchF I r) = 1 + (my_size_regex my_size r)"
+| "my_size (Formula.MatchP I r) = 1 + (my_size_regex my_size r)"
+| "my_size (Formula.Neg \<alpha>) = 1 + my_size \<alpha>" *)
+
 fun my_size :: "rformula \<Rightarrow> nat" where
   "my_size (RPred r ts) = 1"
 | "my_size (RLet p _ \<phi> \<psi>) = 1"
@@ -974,25 +1149,14 @@ fun my_size :: "rformula \<Rightarrow> nat" where
 | "my_size (RSquareW I \<alpha>) =1 + my_size \<alpha>"
 | "my_size (RSquareB I \<alpha>) = 1 + my_size \<alpha>"
 
+
+lemma my_size_neg_sub: "my_size a = my_size b \<Longrightarrow> my_size (RNeg a) = my_size (RNeg b)" by simp
+
 lemma shift_size: "my_size (shiftI_r b \<alpha>) = my_size \<alpha>" 
 proof(induction \<alpha> arbitrary: b)
-case (RNeg \<alpha>)
-  then show ?case sorry
 next
   case (RAnds x)
-  then show ?case sorry
-next
-case (RSince \<alpha>1 x2 \<alpha>2)
-  then show ?case sorry
-next
-  case (RUntil \<alpha>1 x2 \<alpha>2)
-  then show ?case sorry
-next
-  case (RRelease \<alpha>1 x2 \<alpha>2)
-  then show ?case sorry
-next
-  case (RTrigger \<alpha>1 x2 \<alpha>2)
-then show ?case sorry
+  then show ?case by (induction x;auto)
 next
   case (RMatchF I r)
 then show ?case by (induction r;auto)
