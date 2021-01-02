@@ -1049,7 +1049,14 @@ f_con_6_t: "f_con (\<lambda>f1. Formula.Prev I f1)" |
 f_con_7_t: "f_con (\<lambda>f1. Formula.Agg n1 op n2 t f1)"
 
 
-lemma same_fv: "Formula.sat \<sigma> V v i \<alpha> = Formula.sat \<sigma> V v i \<beta> \<Longrightarrow> fv \<alpha> = fv \<beta>" sorry
+lemma same_fv: 
+  assumes A:"Formula.sat \<sigma> V v i \<alpha> = Formula.sat \<sigma> V v i \<beta>"
+  shows "fv \<alpha> = fv \<beta>"
+proof(rule classical)
+  assume "fv \<alpha> \<noteq> fv \<beta>"
+  then have "Formula.sat \<sigma> V v i \<alpha> \<noteq> Formula.sat \<sigma> V v i \<beta>" sorry
+  then show ?thesis using A by contradiction
+qed 
 
 lemma sub_1: "f_con P \<Longrightarrow> (\<And>v i. Formula.sat \<sigma> V v i (project \<alpha>) = Formula.sat \<sigma> V v i (project \<beta>)) \<Longrightarrow> Formula.sat \<sigma> V v i (P (project \<alpha>)) = Formula.sat \<sigma> V v i (P (project \<beta>))" 
 proof(induction P arbitrary: v rule:f_con.induct)
@@ -1102,7 +1109,28 @@ trans7: "trans (\<lambda>f1. RAgg n1 op n2 t f1) (\<lambda>f1. Formula.Agg n1 op
 
 
 lemma trans1: "trans P P' \<Longrightarrow> f_conr P \<and> f_con P' " 
-  using f_con.simps f_conr.simps trans.simps sorry
+proof(induction P P' rule: trans.induct)
+  case trans1
+  then show ?case using f_conr_1_t f_con_1_t by auto
+next
+  case trans2
+  then show ?case using f_conr_2_t f_con_2_t by auto
+next
+  case (trans3 I)
+  then show ?case using f_conr_3_t f_con_3_t by auto
+next
+case (trans4 I)
+  then show ?case using f_conr_4_t f_con_4_t by auto
+next
+  case (trans5 I)
+  then show ?case using f_conr_5_t f_con_5_t by auto
+next
+  case (trans6 I)
+  then show ?case using f_conr_6_t f_con_6_t by auto
+next
+  case (trans7 n1 op n2 t)
+then show ?case using f_conr_7_t f_con_7_t by auto
+qed
 
 lemma trans2: "trans P P' \<Longrightarrow> project (P r) = P' (project r)" 
   by(induction P P' rule:trans.induct;simp)
