@@ -855,6 +855,8 @@ lemma my_size_list_cong[fundef_cong]:
   "fs = fs' \<Longrightarrow> (\<And>z. z \<in> set fs \<Longrightarrow> fun z = fun' z) \<Longrightarrow> my_size_list fun fs = my_size_list fun' fs'" 
   by (induct fs arbitrary: fs') auto
 
+
+(*define custom size function because it ignores everything but layers of formula constructors*)
 fun my_size :: "rformula \<Rightarrow> nat" where
   "my_size (RPred r ts) = 1"
 | "my_size (RLet p _ \<phi> \<psi>) = 1"
@@ -883,6 +885,7 @@ fun my_size :: "rformula \<Rightarrow> nat" where
 | "my_size (RSquareB I \<alpha>) = 1 + my_size \<alpha>"
 
 
+lemma ands_size: "my_size (RAnds rs) > my_size_list my_size rs " by simp
 lemma my_size_neg_sub: "my_size a = my_size b \<Longrightarrow> my_size (RNeg a) = my_size (RNeg b)" by simp
 
 lemma shift_size: "my_size (shiftI_r b \<alpha>) = my_size \<alpha>" 
@@ -985,22 +988,25 @@ function(sequential) rewrite where
        then RAnd (rewrite \<alpha> Same) (RNext I (RAnd (RPrev I (rewrite \<alpha> Same)) (rewrite \<beta> Same)))
        else let \<alpha>' = rewrite \<alpha> Same; \<beta>' = rewrite \<beta> Same in (RAnd \<alpha>' (RNext I \<beta>')))"
 
-(*6,8*)| "rewrite (RSince (RAnd \<alpha> \<gamma>) I \<beta>) t =  
-             (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I)
-               then if t=Swapped then RSince (rewrite (RAnd (RDiamondB (init_int I) \<alpha>) \<beta>) Same) I (rewrite (RAnd \<alpha> \<gamma>) Same)
-                                 else if excl_zero I 
-                                         then RSince (rewrite (RAnd \<alpha> \<gamma>) Same) I (rewrite (RAnd (RDiamondW I \<alpha>) \<beta>) Same) 
-                                         else RSince (rewrite (RAnd \<alpha> \<gamma>) Same) I (rewrite \<beta> Same)
-               else fix_r (RSince (rewrite (RAnd \<alpha> \<gamma>) Same) I (rewrite \<beta> Same)) t)"
+(*6 first, then 8*)
+| "rewrite (RSince (RAnd \<alpha> \<gamma>) I \<beta>) t =  
+             (let l = rewrite (RAnd \<alpha> \<gamma>) Same;
+                  r =      if t=Same \<and> excl_zero I \<and> prop_cond \<alpha> \<beta> then rewrite (RAnd (RDiamondW I \<alpha>) \<beta>) Same
+                      else if t=Same \<and> excl_zero I \<and> prop_cond \<gamma> \<beta> then rewrite (RAnd (RDiamondW I \<gamma>) \<beta>) Same
+                      else if t=Swapped \<and> finite_int I \<and> prop_cond \<alpha> \<beta> then rewrite (RAnd (RDiamondB (init_int I) \<alpha>) \<beta>) Same
+                      else if t=Swapped \<and> finite_int I \<and> prop_cond \<gamma> \<beta> then rewrite (RAnd (RDiamondB (init_int I) \<gamma>) \<beta>) Same
+                      else rewrite \<beta> Same
+              in fix_r (RSince l I r) t)"
 
-(*7,9*)| "rewrite (RUntil (RAnd \<alpha> \<gamma>) I \<beta>) t =  
-             (if (prop_cond \<alpha> \<beta>) \<and> (finite_int I)
-               then if t=Swapped then RUntil (rewrite (RAnd (RDiamondW (init_int I) \<alpha>) \<beta>) Same) I (rewrite (RAnd \<alpha> \<gamma>) Same)
-                                 else if excl_zero I 
-                                         then RUntil (rewrite (RAnd \<alpha> \<gamma>) Same) I (rewrite (RAnd (RDiamondB I \<alpha>) \<beta>) Same) 
-                                         else RUntil (rewrite (RAnd \<alpha> \<gamma>) Same) I (rewrite \<beta> Same)
-               else fix_r (RUntil (rewrite (RAnd \<alpha> \<gamma>) Same) I (rewrite \<beta> Same)) t)"
-
+(*7 first, else 9*) (*don't check finite_int for 9 because rewrite doesn't alter monitorability for future unbounded temporal operators*)
+| "rewrite (RUntil (RAnd \<alpha> \<gamma>) I \<beta>) t =  
+             (let l = rewrite (RAnd \<alpha> \<gamma>) Same;
+                  r =      if t=Same \<and> excl_zero I \<and> prop_cond \<alpha> \<beta> then rewrite (RAnd (RDiamondB I \<alpha>) \<beta>) Same
+                      else if t=Same \<and> excl_zero I \<and> prop_cond \<gamma> \<beta> then rewrite (RAnd (RDiamondB I \<gamma>) \<beta>) Same
+                      else if t=Swapped \<and> prop_cond \<alpha> \<beta> then rewrite (RAnd (RDiamondW (init_int I) \<alpha>) \<beta>) Same
+                      else if t=Swapped \<and> prop_cond \<gamma> \<beta> then rewrite (RAnd (RDiamondW (init_int I) \<gamma>) \<beta>) Same
+                      else rewrite \<beta> Same
+              in fix_r (RUntil l I r) t)" 
 
 | "rewrite (RSince l I r) Same = rewrite (RSince r I l) Swapped"
 | "rewrite (RUntil l I r) Same = rewrite (RUntil r I l) Swapped"
@@ -1026,17 +1032,20 @@ function(sequential) rewrite where
 | "rewrite (RSquareW I \<alpha>) t = RSquareW I (rewrite \<alpha> Same)"
 | "rewrite (RSquareB I \<alpha>) t = RSquareB I (rewrite \<alpha> Same)"
 
-(*| "rewrite (RMatchF I r) t = RMatchF I (my_map_regex (\<lambda>f. rewrite f Same) r)"
+| "rewrite (RMatchF I r) t = RMatchF I (my_map_regex (\<lambda>f. rewrite f Same) r)"
 | "rewrite (RMatchP I r) t = RMatchP I (regex.map_regex (\<lambda>f. rewrite f Same) r)"
-| "rewrite (RAnds \<phi>s) t = RAnds (map (\<lambda>r. rewrite r Same) \<phi>s)"*)                                    (*TODO: ADD THESE CASES*)
+| "rewrite (RAnds \<phi>s) t = RAnds (map (\<lambda>r. rewrite r Same) \<phi>s)"
   
 | "rewrite f t =  f "
 
   by pat_completeness auto
 termination
-  apply(relation "measures [(\<lambda>(f,t). (my_size f)),(\<lambda>(f,t). size_argpos t)]")
-  apply (auto simp add: shift_size not_zero) (*not_zero important because size of constructor then depends on its' number of arguments*)
-  done
+
+ apply(relation "measures [(\<lambda>(f,t). (my_size f)),(\<lambda>(f,t). size_argpos t)]")
+ apply (auto simp add:  shift_size not_zero ands_size map_cong) (*not_zero important because size of constructor then depends on its' number of arguments*)
+ sorry
+  
+
 
 
 inductive f_con where
@@ -1198,8 +1207,6 @@ abbreviation "rewrite_f a \<equiv> project (rewrite (embed a) Same)"
 
 
 
-
-
 lemma rewrite_sat: "rsat \<sigma> V v i (rewrite r t) = rsat \<sigma> V v i (fix_r r t)"
 proof(induction r t arbitrary: v i rule: rewrite.induct)
   case (1 \<alpha> \<beta> \<gamma> t)
@@ -1315,7 +1322,7 @@ next
 next
   case (12 \<alpha> I \<beta> t)
   then show ?case
-proof(cases "prop_cond \<alpha> \<beta> ")
+proof(cases "prop_cond \<alpha> \<beta> ") 
   case True
   then show ?thesis using rsub_2[OF f_conr2_2_t 12(1)[OF True] rsub_1[OF f_conr_6_t rsub_2[OF f_conr2_2_t rsub_1[OF f_conr_5_t 12(1)[OF True]] 12(3)[OF True]]]] sat_main_22[symmetric]
     apply(simp only: rewrite.simps fix_r.simps  split:if_splits)
@@ -1330,96 +1337,146 @@ next
   then show ?case by (auto simp add: rsat_def)
 next
   case (14 \<alpha> \<gamma> I \<beta> t)
+  let ?a = "t=Same \<and> excl_zero I \<and> prop_cond \<alpha> \<beta>"
+  let ?b = "t=Same \<and> excl_zero I \<and> prop_cond \<gamma> \<beta>"
+  let ?c = "t=Swapped \<and> finite_int I \<and> prop_cond \<alpha> \<beta>"
+  let ?d = "t=Swapped \<and> finite_int I \<and> prop_cond \<gamma> \<beta>"
+  consider (a) ?a |
+           (b) "\<not>?a" "?b" | 
+           (c) "\<not>?a" "\<not>?b" "?c" |
+           (d) "\<not>?a" "\<not>?b" "\<not>?c" "?d" |
+           (e) "\<not>?a" "\<not>?b" "\<not>?c" "\<not>?d"  by argo
   then show ?case 
-  proof(cases "(prop_cond \<alpha> \<beta>) \<and> (finite_int I)")
-    case T1:True
-    then show ?thesis 
-    proof(cases "t=Swapped")
-      case True
-      then show ?thesis using T1 
-        apply(simp del: sat.simps  add:  rsub_2[OF f_conr2_5_t 14(1-2)[OF T1 True]]  split:if_splits) (*remove recursion*)
+  proof(cases)
+    case a
+    then have ex:"excl_zero I" by auto
+    from a show ?thesis
+          apply(simp del: sat.simps add: rsub_2[OF f_conr2_5_t 14(1) 14(2)[OF refl a ]]  split:if_splits )
         apply(simp only: rsat_def project1.simps  project2.simps)(*remove embedding*)
-        apply(simp only:sat_main_8[symmetric])(*apply rewrite lemma*)
-        done
-    next
-      case F1:False
-      then show ?thesis 
-      proof(cases "excl_zero I")
-        case True
-        then show ?thesis using T1 not_swapped[OF F1]
-          apply(simp del: sat.simps add: rsub_2[OF f_conr2_5_t 14(3-4)[OF T1 F1 True]]  split:if_splits )
-        apply(simp only: rsat_def project1.simps  project2.simps)(*remove embedding*)
-          apply(simp only:sat_main_6[OF True, symmetric])(*apply rewrite lemma*)
-          done
-      next
-        case False
-        then show ?thesis using T1 not_swapped[OF F1]
-          apply(simp del: sat.simps add:rsub_2[OF f_conr2_5_t 14(5-6)[OF T1 F1 False]]  split:if_splits )
-          done (*already succeeds here because they only differ in that LHS has recursion*)
-      qed
-    qed
-  next
-    case F1:False
-  then show ?thesis
-  proof(cases "t=Swapped")
-    case True
-    then show ?thesis using F1
-      apply(simp only: rewrite.simps fix_r.simps if_False)
-    apply(simp add: rsub_2[OF f_conr2_5_t 14(8,7)[OF F1]])
+          apply(simp only:sat_main_6[OF ex, symmetric])(*apply rewrite lemma*)
       done
   next
-    case False 
-    then show ?thesis  using F1 not_swapped[OF False]
-    apply(simp only: rewrite.simps fix_r.simps  if_False) (*apply if_False to reduce if-statement instead of splitting it*)
-    apply(simp add: rsub_2[OF f_conr2_5_t 14(7-8)[OF F1]])
+    case b
+    then have ex:"excl_zero I" by auto
+    have swap: "rsat \<sigma> V v i (RSince (RAnd \<alpha> \<gamma>) I (RAnd (RDiamondW I \<gamma>) \<beta>)) = rsat \<sigma> V v i (RSince (RAnd \<alpha> \<gamma>) I \<beta>) \<longleftrightarrow>
+                rsat \<sigma> V v i (RSince (RAnd \<gamma> \<alpha>) I (RAnd (RDiamondW I \<gamma>) \<beta>)) = rsat \<sigma> V v i (RSince (RAnd \<gamma> \<alpha>) I \<beta>)" by(simp add: rsat_def;fast) 
+    from b show ?thesis using swap
+      apply(simp only:rewrite.simps)
+        apply(simp del: sat.simps  add: rsub_2[OF f_conr2_5_t 14(1) 14(3)[OF refl b]]  split:if_splits) (*remove recursion*)
+      apply(simp only: rsat_def project1.simps  project2.simps)(*remove embedding*)
+        apply(rule sat_main_6[OF ex, symmetric])(*apply rewrite lemma*)
+      done
+next
+  case c
+  then show ?thesis 
+    apply(simp only:rewrite.simps)
+        apply(simp del: sat.simps  add: rsub_2[OF f_conr2_5_t 14(4)[OF refl c] 14(1)]  split:if_splits) (*remove recursion*)
+      apply(simp only: rsat_def project1.simps  project2.simps)(*remove embedding*)
+    apply(rule sat_main_8[symmetric])
     done
+next
+  case d
+  have swap:"rsat \<sigma> V v i (RSince (RAnd (RDiamondB (init_int I) \<gamma>) \<beta>) I (RAnd \<alpha> \<gamma>)) = 
+             rsat \<sigma> V v i (RSince (RAnd (RDiamondB (init_int I) \<gamma>) \<beta>) I (RAnd \<gamma> \<alpha>))" 
+            "rsat \<sigma> V v i (RSince \<beta> I (RAnd \<alpha> \<gamma>)) = rsat \<sigma> V v i (RSince \<beta> I (RAnd \<gamma> \<alpha>))" using rsat_def by auto
+  from d show ?thesis
+    apply(simp only:rewrite.simps)
+    apply(simp del: sat.simps  add: rsub_2[OF f_conr2_5_t 14(5)[OF refl d] 14(1)]  split:if_splits) (*remove recursion*)
+    apply(simp only: swap)
+    apply(simp only: rsat_def project1.simps  project2.simps)(*remove embedding*)
+    apply(rule sat_main_8[symmetric])
+    done
+next
+  case e
+  then show ?thesis 
+  proof(cases "t=Swapped")
+    case True
+    then show ?thesis using e
+      apply(simp only:rewrite.simps)
+      apply(simp del: sat.simps  add: rsub_2[OF f_conr2_5_t 14(6)[OF refl e]] 14(1)  split:if_splits) (*remove recursion*)
+      done
+  next
+    case False
+    then show ?thesis using e not_swapped[OF False]
+      apply(simp only:rewrite.simps fix_r.simps)
+      apply(simp del: sat.simps  add: rsub_2[OF f_conr2_5_t 14(1) 14(6)[OF refl e]]  split:if_splits) (*remove recursion*)
+      done
   qed
-  qed
+qed
 next
 case (15 \<alpha> \<gamma> I \<beta> t)
+  let ?a = "t=Same \<and> excl_zero I \<and> prop_cond \<alpha> \<beta>"
+  let ?b = "t=Same \<and> excl_zero I \<and> prop_cond \<gamma> \<beta>"
+  let ?c = "t=Swapped \<and> prop_cond \<alpha> \<beta>"
+  let ?d = "t=Swapped \<and> prop_cond \<gamma> \<beta>"
+  consider (a) ?a |
+           (b) "\<not>?a" "?b" | 
+           (c) "\<not>?a" "\<not>?b" "?c" |
+           (d) "\<not>?a" "\<not>?b" "\<not>?c" "?d" |
+           (e) "\<not>?a" "\<not>?b" "\<not>?c" "\<not>?d"  by argo
   then show ?case 
-  proof(cases "(prop_cond \<alpha> \<beta>) \<and> (finite_int I)")
-    case T1:True
-    then show ?thesis 
-    proof(cases "t=Swapped")
-      case True
-      then show ?thesis using T1 
-        apply(simp del: sat.simps  add: rsub_2[OF f_conr2_6_t 15(1-2)[OF T1 True]]   split:if_splits) (*remove recursion*)
+  proof(cases)
+    case a
+    then have ex:"excl_zero I" by auto
+    from a show ?thesis
+          apply(simp del: sat.simps add: rsub_2[OF f_conr2_6_t 15(1) 15(2)[OF refl a ]]  split:if_splits )
         apply(simp only: rsat_def project1.simps  project2.simps)(*remove embedding*)
-        apply(simp only:sat_main_9[symmetric])(*apply rewrite lemma*)
-        done
-    next
-      case F1:False
-      then show ?thesis 
-      proof(cases "excl_zero I")
-        case True
-        then show ?thesis using T1 not_swapped[OF F1]
-          apply(simp del: sat.simps add: rsub_2[OF f_conr2_6_t 15(3-4)[OF T1 F1 True]]  split:if_splits )
-        apply(simp only: rsat_def project1.simps  project2.simps)(*remove embedding*)
-          apply(simp only:sat_main_7[OF True, symmetric])(*apply rewrite lemma*)
-          done
-      next
-        case False
-        then show ?thesis using T1 not_swapped[OF F1]
-          apply(simp del: sat.simps add:rsub_2[OF f_conr2_6_t 15(5-6)[OF T1 F1 False]]  split:if_splits )
-          done (*already succeeds here because they only differ in that LHS has recursion*)
-      qed
-    qed
-  next
-    case F1:False
-  then show ?thesis
-  proof(cases "t=Swapped")
-    case True
-    then show ?thesis using F1
-      apply(simp only: rewrite.simps rsub_2[OF f_conr2_6_t 15(8,7)[OF F1]]  fix_r.simps if_False)
+          apply(simp only:sat_main_7[OF ex, symmetric])(*apply rewrite lemma*)
       done
   next
-    case False 
-    then show ?thesis  using F1 not_swapped[OF False]
-    apply(simp only: rewrite.simps fix_r.simps rsub_2[OF f_conr2_6_t 15(7-8)[OF F1]]  if_False) (*apply if_False to reduce if-statement instead of splitting it*)
+    case b
+    then have ex:"excl_zero I" by auto
+    have swap: "rsat \<sigma> V v i (RUntil (RAnd \<alpha> \<gamma>) I (RAnd (RDiamondB I \<gamma>) \<beta>)) = rsat \<sigma> V v i (RUntil (RAnd \<gamma> \<alpha>) I (RAnd (RDiamondB I \<gamma>) \<beta>))"
+               "rsat \<sigma> V v i (RSince (RAnd \<alpha> \<gamma>) I \<beta>) = rsat \<sigma> V v i (RSince (RAnd \<gamma> \<alpha>) I \<beta>)" using rsat_def by auto 
+    from b show ?thesis 
+      apply(simp only:rewrite.simps)
+      apply(simp del: sat.simps  add: rsub_2[OF f_conr2_6_t 15(1) 15(3)[OF refl b]]  split:if_splits) (*remove recursion*)
+      apply(simp only: swap)
+      apply(simp only: rsat_def project1.simps  project2.simps)(*remove embedding*)
+      apply(simp only: sat_main_7[OF ex, symmetric])(*apply rewrite lemma*)
+      apply(auto)
+      done
+next
+  case c
+  thm 15(1)
+  thm 15(4)[OF refl ]
+  thm rsub_2[OF f_conr2_5_t  ]
+  thm sat_main_8[symmetric]
+  then show ?thesis 
+    apply(simp only:rewrite.simps)
+        apply(simp del: sat.simps  add: rsub_2[OF f_conr2_6_t 15(4)[OF refl c] 15(1)]  split:if_splits) (*remove recursion*)
+      apply(simp only: rsat_def project1.simps  project2.simps)(*remove embedding*)
+    apply(rule sat_main_9[symmetric])
     done
+next
+  case d
+  have swap:"rsat \<sigma> V v i (RUntil (RAnd (RDiamondW (init_int I) \<gamma>) \<beta>) I (RAnd \<alpha> \<gamma>)) = 
+             rsat \<sigma> V v i (RUntil (RAnd (RDiamondW (init_int I) \<gamma>) \<beta>) I (RAnd \<gamma> \<alpha>))" 
+            "rsat \<sigma> V v i (RUntil \<beta> I (RAnd \<alpha> \<gamma>)) = rsat \<sigma> V v i (RUntil \<beta> I (RAnd \<gamma> \<alpha>))" using rsat_def by auto
+  from d show ?thesis using swap
+    apply(simp only:rewrite.simps)
+    apply(simp del: sat.simps  add: rsub_2[OF f_conr2_6_t 15(5)[OF refl d] 15(1)]  split:if_splits) (*remove recursion*)
+    apply(simp only: swap)
+    apply(simp only: rsat_def project1.simps  project2.simps)(*remove embedding*)
+    apply(rule sat_main_9[symmetric])
+    done
+next
+  case e
+  then show ?thesis 
+  proof(cases "t=Swapped")
+    case True
+    then show ?thesis using e
+      apply(simp only:rewrite.simps)
+      apply(simp del: sat.simps  add: rsub_2[OF f_conr2_6_t 15(6)[OF refl e]] 15(1)  split:if_splits) (*remove recursion*)
+      done
+  next
+    case False
+    then show ?thesis using e not_swapped[OF False]
+      apply(simp only:rewrite.simps fix_r.simps)
+      apply(simp del: sat.simps  add: rsub_2[OF f_conr2_6_t 15(1) 15(6)[OF refl e]]  split:if_splits) (*remove recursion*)
+      done
   qed
-  qed
+qed
 next
   case (24 y \<omega> b' f \<phi> t)
   then show ?case
