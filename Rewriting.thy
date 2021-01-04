@@ -826,7 +826,7 @@ fun size_argpos :: "argpos \<Rightarrow> nat"where
 | "size_argpos Swapped = 0"
 
 
-primrec my_size_regex where
+primrec my_size_regex :: "('a \<Rightarrow> nat) \<Rightarrow> 'a Regex.regex \<Rightarrow> nat" where
   "my_size_regex fun (Regex.Skip n) = 0"
 | "my_size_regex fun (Regex.Test \<phi>) = fun \<phi>"
 | "my_size_regex fun (Regex.Plus r s) = my_size_regex fun r + my_size_regex fun s"
@@ -837,17 +837,7 @@ lemma my_size_regex_cong[fundef_cong]:
   "r = r' \<Longrightarrow> (\<And>z. z \<in> Regex.atms r \<Longrightarrow> fun z = fun' z) \<Longrightarrow> my_size_regex fun r = my_size_regex fun' r'"
   by (induct r arbitrary: r') auto
 
-
-primrec my_map_regex where
-  "my_map_regex fun (Regex.Skip n) = Regex.Skip n"
-| "my_map_regex fun (Regex.Test \<phi>) = Regex.Test (fun \<phi>)"
-| "my_map_regex fun (Regex.Plus r s) = Regex.Plus (my_map_regex fun r) (my_map_regex fun s)"
-| "my_map_regex fun (Regex.Times r s) = Regex.Times (my_map_regex fun r) (my_map_regex fun s)"
-| "my_map_regex fun (Regex.Star r) = Regex.Star (my_map_regex fun r)"
-
-
-
-fun my_size_list where
+fun my_size_list :: "('a \<Rightarrow> nat) \<Rightarrow> 'a list \<Rightarrow> nat" where
  "my_size_list fun (f#fs) = fun f + my_size_list fun fs" 
 | "my_size_list fun [] = 0"
 
@@ -903,12 +893,6 @@ qed auto
 
 lemma not_zero: "my_size \<alpha> > 0" by (induction \<alpha>;auto)
 
-
-
-lemma rewrite1_conj[fundef_cong]: "(\<And>x. f x = g x) \<Longrightarrow> rewrite1 f \<alpha> = rewrite1 g \<alpha>" by presburger
-
-lemma project_cong[fundef_cong]: "f1 = f2 \<Longrightarrow> project f1 = project f2" by auto  
-
 fun fix_r where
  "fix_r (RSince l I r) Swapped = RSince r I l"
 | "fix_r (RUntil l I r) Swapped = RUntil r I l"
@@ -919,7 +903,19 @@ lemma not_swapped: "t \<noteq> Swapped \<Longrightarrow> t = Same" by (induction
 
 lemma fix_r_same: "fix_r r Same = r" by auto
 
+declare regex.map_cong[fundef_cong]
 
+lemma my_size_list_estimation[termination_simp]: "x \<in> set xs \<Longrightarrow> y < f x \<Longrightarrow> y < my_size_list f xs"
+  by (induct xs) auto
+
+lemma my_size_list_estimation'[termination_simp]: "x \<in> set xs \<Longrightarrow> y \<le> f x \<Longrightarrow> y \<le> my_size_list f xs"
+  by (induct xs) auto
+
+lemma my_size_regex_estimation[termination_simp]: "x \<in> regex.atms r \<Longrightarrow> y < f x \<Longrightarrow> y < my_size_regex f r"
+  by (induct r) auto
+
+lemma my_size_regex_estimation'[termination_simp]: "x \<in> regex.atms r \<Longrightarrow> y \<le> f x \<Longrightarrow> y \<le> my_size_regex f r"
+  by (induct r) auto
 
 
 function(sequential) rewrite where
@@ -1032,18 +1028,18 @@ function(sequential) rewrite where
 | "rewrite (RSquareW I \<alpha>) t = RSquareW I (rewrite \<alpha> Same)"
 | "rewrite (RSquareB I \<alpha>) t = RSquareB I (rewrite \<alpha> Same)"
 
-| "rewrite (RMatchF I r) t = RMatchF I (my_map_regex (\<lambda>f. rewrite f Same) r)"
+| "rewrite (RMatchF I r) t = RMatchF I (regex.map_regex (\<lambda>f. rewrite f Same) r)"
 | "rewrite (RMatchP I r) t = RMatchP I (regex.map_regex (\<lambda>f. rewrite f Same) r)"
 | "rewrite (RAnds \<phi>s) t = RAnds (map (\<lambda>r. rewrite r Same) \<phi>s)"
   
-| "rewrite f t =  f "
+| "rewrite f t =  f"
 
   by pat_completeness auto
 termination
 
- apply(relation "measures [(\<lambda>(f,t). (my_size f)),(\<lambda>(f,t). size_argpos t)]")
- apply (auto simp add:  shift_size not_zero ands_size map_cong) (*not_zero important because size of constructor then depends on its' number of arguments*)
- sorry
+ apply(relation "measures [(\<lambda>(f,t). my_size f),(\<lambda>(f,t). size_argpos t)]")
+ apply (auto simp add:  shift_size not_zero ands_size map_cong termination_simp) (*not_zero important because size of constructor then depends on its' number of arguments*)
+ done
   
 
 
