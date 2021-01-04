@@ -1487,6 +1487,12 @@ next
   then show ?case 
     apply(simp only:rewrite.simps fix_r.simps rsub_1[OF f_conr_6_t 25])
     done
+next
+  case (34 I r t)
+  then show ?case by (metis fix_r.simps(23) rewrite.simps(136))
+next
+  case (35 I r t)
+  then show ?case by (metis fix_r.simps(24) rewrite.simps(137))
 qed (simp only:rewrite.simps fix_r.simps rsat_def;auto)+
 
 lemma final_sat: "Formula.sat \<sigma> V v i (rewrite_f f) = Formula.sat \<sigma> V v i f" 
