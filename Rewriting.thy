@@ -1053,15 +1053,10 @@ f_con_5_t: "f_con (\<lambda>f1. Formula.Next I f1)"|
 f_con_6_t: "f_con (\<lambda>f1. Formula.Prev I f1)" |
 f_con_7_t: "f_con (\<lambda>f1. Formula.Agg n1 op n2 t f1)"
 
+lemma test:"(\<And>v.(Formula.sat \<sigma> V v i \<alpha>) = (Formula.sat \<sigma> V v i \<beta>)) \<Longrightarrow>
+            ({(x, ecard Zs) | x Zs. Zs = {zs. length zs = b \<and> Formula.sat \<sigma> V (zs @ v) i \<phi> \<and> Formula.eval_trm (zs @ v) f = x} \<and> Zs \<noteq> {}} = {} \<Longrightarrow> fv \<phi> \<subseteq> {0..<b}) \<Longrightarrow> 
+            ({(x, ecard Zs) | x Zs. Zs = {zs. length zs = b \<and> Formula.sat \<sigma> V (zs @ v) i \<beta> \<and> Formula.eval_trm (zs @ v) f = x} \<and> Zs \<noteq> {}} = {} \<Longrightarrow> fv \<beta> \<subseteq> {0..<b})" sledgehammer
 
-lemma same_fv: 
-  assumes A:"Formula.sat \<sigma> V v i \<alpha> = Formula.sat \<sigma> V v i \<beta>"
-  shows "fv \<alpha> = fv \<beta>"
-proof(rule classical)
-  assume "fv \<alpha> \<noteq> fv \<beta>"
-  then have "Formula.sat \<sigma> V v i \<alpha> \<noteq> Formula.sat \<sigma> V v i \<beta>" sorry
-  then show ?thesis using A by contradiction
-qed 
 
 lemma sub_1: "f_con P \<Longrightarrow> (\<And>v i. Formula.sat \<sigma> V v i (project \<alpha>) = Formula.sat \<sigma> V v i (project \<beta>)) \<Longrightarrow> Formula.sat \<sigma> V v i (P (project \<alpha>)) = Formula.sat \<sigma> V v i (P (project \<beta>))" 
 proof(induction P arbitrary: v rule:f_con.induct)
@@ -1090,6 +1085,137 @@ lemma sub_2: "f_con2 P \<Longrightarrow> (\<And>v i. Formula.sat \<sigma> V v i 
                                  Formula.sat \<sigma> V v i (P (project a1) (project a2)) = Formula.sat \<sigma> V v i (P (project b1) (project b2))" 
   by(induction P rule:f_con2.induct;auto)
 
+inductive f_con_agg where
+f_con_agg_1_t: "f_con_agg (\<lambda>f1. Formula.Agg n1 op n2 t f1)"
+
+lemma sub_agg: "f_con_agg P \<Longrightarrow> (\<And>v i. Formula.sat \<sigma> V v i (project \<alpha>) = Formula.sat \<sigma> V v i (project \<beta>)) \<Longrightarrow> fv (project \<alpha>) = fv (project \<beta>) 
+                          \<Longrightarrow> Formula.sat \<sigma> V v i (P (project \<alpha>)) = Formula.sat \<sigma> V v i (P (project \<beta>))" 
+proof(induction P rule: f_con_agg.induct)
+  case (f_con_agg_1_t n1 op n2 t)
+  then show ?case by simp
+qed
+
+lemma fvi_shift: "Formula.fvi b \<phi> = Formula.fvi (Suc b) (Rewriting.shift \<phi>)" sorry
+
+lemma rewrite_fv: "Formula.fvi b (project \<alpha>) = Formula.fvi b (project (rewrite \<alpha> t))"
+proof(induction \<alpha> t arbitrary:b rule:rewrite.induct)
+  case (3 \<alpha> \<beta> I \<gamma> t)
+  then show ?case  
+  proof(cases "prop_cond \<alpha> \<beta>")
+    case T1:True
+    then show ?thesis 
+    proof(cases "prop_cond \<beta> \<alpha>")
+      case T2:True
+      then show ?thesis 
+      proof(cases "prop_cond \<gamma> \<alpha>")
+        thm 3(1)
+        case True
+        then show ?thesis using 3[where ?b=b] T1 T2 by auto
+      next
+        case False
+        then show ?thesis using 3[where ?b=b] T1 T2 by auto
+      qed  
+    next
+      case F1:False
+      then show ?thesis 
+      proof(cases "prop_cond \<gamma> \<alpha>")
+        case True
+        then show ?thesis using 3[where ?b=b] T1 F1 by auto
+      next
+        case False
+        then show ?thesis using 3[where ?b=b] T1 F1 by auto
+      qed      
+    qed
+  next
+    case F1:False
+    then show ?thesis 
+      proof(cases "prop_cond \<beta> \<alpha>")
+      case T2:True
+      then show ?thesis 
+      proof(cases "prop_cond \<gamma> \<alpha>")
+        case True
+        then show ?thesis using 3 F1 T2 by auto
+      next
+        case False
+        then show ?thesis using 3 F1 T2 by auto
+      qed  
+    next
+      case F1:False
+      then show ?thesis 
+      proof(cases "prop_cond \<gamma> \<alpha>")
+        case True
+        then show ?thesis using 3[where ?b=b] F1 F1 by auto
+      next
+        case False
+        then show ?thesis using 3[where ?b=b] F1 F1 by auto
+      qed      
+    qed
+  qed
+next
+  case (4 \<alpha> \<beta> t)
+  then show ?case  
+    proof(cases "prop_cond \<alpha> \<beta>")
+      case True
+      have helper:"fvi_r b \<alpha>  = Formula.fvi (Suc b) (Rewriting.shift (project \<alpha>))" using fvi_shift by simp
+      from True show ?thesis using 4 helper 
+        apply(simp only:rewrite.simps if_True)
+        apply(simp only:project1.simps project2.simps)
+        apply(simp only:fvi.simps)
+        apply(simp only: 4(1)[OF True,of "Suc b",symmetric])
+        apply(simp only:project1.simps project2.simps)
+        apply(simp only: project_shift)
+        apply(simp only:fvi.simps)
+        done
+    next
+      case False
+      then show ?thesis using 4 by auto
+    qed
+next
+  case (14 \<alpha> \<gamma> I \<beta> t)
+  let ?a = "t=Same \<and> excl_zero I \<and> prop_cond \<alpha> \<beta>"
+  let ?b = "t=Same \<and> excl_zero I \<and> prop_cond \<gamma> \<beta>"
+  let ?c = "t=Swapped \<and> finite_int I \<and> prop_cond \<alpha> \<beta>"
+  let ?d = "t=Swapped \<and> finite_int I \<and> prop_cond \<gamma> \<beta>"
+  consider (a) ?a |
+           (b) "\<not>?a" "?b" | 
+           (c) "\<not>?a" "\<not>?b" "?c" |
+           (d) "\<not>?a" "\<not>?b" "\<not>?c" "?d" |
+           (e) "\<not>?a" "\<not>?b" "\<not>?c" "\<not>?d"  by argo
+  then show ?case  
+  proof(cases)
+    case a(*TODO use simplifier for these proofs, also prove shift_fv2*)
+    then show ?thesis using 14 sorry
+  next
+    case b
+    then show ?thesis using 14 sorry
+  next
+    case c
+    then show ?thesis using 14 sorry
+  next
+    case d
+    then show ?thesis using 14 sorry
+  next
+    case e
+  then show ?thesis using 14 sorry
+  qed
+next
+  case (15 \<alpha> \<gamma> I \<beta> t)
+  then show ?case  sorry
+next
+
+  case (23 \<phi> t)
+  then show ?case sorry
+next
+  case (24 y \<omega> b' f \<phi> t)
+  then show ?case sorry
+next
+case (34 I r t)
+  then show ?case by (induction r;auto)
+next
+  case (35 I r t)
+  then show ?case by (induction r;auto)
+qed auto
+
 
 
 inductive f_conr where
@@ -1098,8 +1224,7 @@ f_conr_2_t: "f_conr (\<lambda>f1. RNeg f1)" |
 f_conr_3_t: "f_conr (\<lambda>f1. RDiamondW I f1)"|
 f_conr_4_t: "f_conr (\<lambda>f1. RDiamondB I f1)" |
 f_conr_5_t: "f_conr (\<lambda>f1. RNext I f1)"|
-f_conr_6_t: "f_conr (\<lambda>f1. RPrev I f1)" |
-f_conr_7_t: "f_conr (\<lambda>f1. RAgg n1 op n2 t f1)"
+f_conr_6_t: "f_conr (\<lambda>f1. RPrev I f1)" 
 
 
 inductive trans where
@@ -1108,10 +1233,8 @@ trans2: "trans (\<lambda>f1. RNeg f1) (\<lambda>f1. Formula.Neg f1)" |
 trans3: "trans (\<lambda>f1. RDiamondW I f1) (\<lambda>f1. Formula.Until TT I f1)"|
 trans4: "trans (\<lambda>f1. RDiamondB I f1)  (\<lambda>f1. Formula.Since TT I f1)" |
 trans5: "trans (\<lambda>f1. RNext I f1) (\<lambda>f1. Formula.Next I f1)"|
-trans6: "trans (\<lambda>f1. RPrev I f1) (\<lambda>f1. Formula.Prev I f1)" |
-trans7: "trans (\<lambda>f1. RAgg n1 op n2 t f1) (\<lambda>f1. Formula.Agg n1 op n2 t f1)"
+trans6: "trans (\<lambda>f1. RPrev I f1) (\<lambda>f1. Formula.Prev I f1)"
         
-
 
 lemma trans1: "trans P P' \<Longrightarrow> f_conr P \<and> f_con P' " 
 proof(induction P P' rule: trans.induct)
@@ -1132,16 +1255,13 @@ next
 next
   case (trans6 I)
   then show ?case using f_conr_6_t f_con_6_t by auto
-next
-  case (trans7 n1 op n2 t)
-then show ?case using f_conr_7_t f_con_7_t by auto
 qed
 
 lemma trans2: "trans P P' \<Longrightarrow> project (P r) = P' (project r)" 
   by(induction P P' rule:trans.induct;simp)
 
 lemma trans3: "f_conr P \<Longrightarrow> \<exists>P'. trans P P'" 
-  using f_conr.simps trans.trans1 trans.trans2 trans3 trans4 trans5 trans6 trans7 by metis
+  using f_conr.simps trans.trans1 trans.trans2 trans3 trans4 trans5 trans6  by metis
 
 
 lemma rsub_1: "f_conr P \<Longrightarrow> (\<And>v i. rsat \<sigma> V v i \<alpha> = rsat \<sigma> V v i \<beta>) \<Longrightarrow> rsat \<sigma> V v i (P \<alpha>) = rsat \<sigma> V v i (P \<beta>)" 
@@ -1194,6 +1314,34 @@ proof -
   moreover have L3:"(\<And>v i. Formula.sat \<sigma> V v i (project a2) = Formula.sat \<sigma> V v i (project b2))" using A(3) by (simp add:rsat_def)
   ultimately show ?thesis 
     using Rewriting.trans2_2 sub_2 rsat_def by presburger
+qed
+
+inductive f_conr_agg where
+f_conr_agg_t: "f_conr_agg (\<lambda>f1. RAgg n1 op n2 t f1)"
+
+inductive trans_agg where
+trans_agg_1: "trans_agg (\<lambda>f1. RAgg n1 op n2 t f1) (\<lambda>f1. Formula.Agg n1 op n2 t f1)"
+
+lemma trans_agg_1: "trans_agg P P' \<Longrightarrow> f_conr_agg P \<and> f_con_agg P' " 
+  using f_con_agg.simps f_conr_agg.simps trans_agg.simps by blast
+
+lemma trans_agg_2: "trans_agg P P' \<Longrightarrow> project (P r) = P' (project r)" 
+  by (induction P P' rule:trans_agg.induct;simp)
+
+lemma trans_agg_3: "f_conr_agg P \<Longrightarrow> \<exists>P'. trans_agg P P'" 
+  apply(induction P rule:f_conr_agg.induct)
+  using trans_agg.trans_agg_1 apply blast
+  done
+
+lemma rsub_agg: "f_conr_agg P \<Longrightarrow> (\<And>v i. rsat \<sigma> V v i a = rsat \<sigma> V v i b) \<Longrightarrow> fv (project a) = fv (project b)   \<Longrightarrow> rsat \<sigma> V v i (P a) = rsat \<sigma> V v i (P b)"  
+proof -
+  assume A: "f_conr_agg P" "(\<And>v i. rsat \<sigma> V v i a = rsat \<sigma> V v i b)" "fv (project a) = fv (project b) "
+  then obtain P2 where P2: "trans_agg P P2" using trans_agg_3[OF A(1)] by auto
+  moreover have L1: "f_con_agg P2" using trans_agg_1[OF P2] by auto
+  moreover have L2:"(\<And>v i. Formula.sat \<sigma> V v i (project a) = Formula.sat \<sigma> V v i (project b))" using A(2) by (simp add:rsat_def)
+  ultimately show ?thesis 
+    using Rewriting.trans_agg_2 sub_agg[OF L1 L2 A(3)] rsat_def 
+    by auto
 qed
 
 
@@ -1476,7 +1624,7 @@ qed
 next
   case (24 y \<omega> b' f \<phi> t)
   then show ?case
-    apply(simp only:rewrite.simps fix_r.simps rsub_1[OF f_conr_7_t 24])
+    apply(simp only:rewrite.simps fix_r.simps rsub_agg[OF f_conr_agg_t 24[symmetric],simplified fix_r.simps, OF rewrite_fv])
     done
 next
   case (25 I \<phi> t)
