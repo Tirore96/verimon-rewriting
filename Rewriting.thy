@@ -1746,10 +1746,10 @@ next
     done
 next
   case (34 I r t)
-  then show ?case by (metis fix_r.simps(23) rewrite.simps(136))
+  then show ?case by (simp add: rsat_def regex.map_comp o_def match_map_regex cong: regex.map_cong)
 next
   case (35 I r t)
-  then show ?case by (metis fix_r.simps(24) rewrite.simps(137))
+  then show ?case by (simp add: rsat_def regex.map_comp o_def match_map_regex cong: regex.map_cong)
 qed (simp only:rewrite.simps fix_r.simps rsat_def;auto)+
 
 lemma final_sat: "Formula.sat \<sigma> V v i (rewrite_f f) = Formula.sat \<sigma> V v i f" 
