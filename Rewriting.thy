@@ -1050,12 +1050,7 @@ f_con_2_t: "f_con (\<lambda>f1. Formula.Neg f1)" |
 f_con_3_t: "f_con (\<lambda>f1. Formula.Until TT I f1)"|
 f_con_4_t: "f_con (\<lambda>f1. Formula.Since TT I f1)" |
 f_con_5_t: "f_con (\<lambda>f1. Formula.Next I f1)"|
-f_con_6_t: "f_con (\<lambda>f1. Formula.Prev I f1)" |
-f_con_7_t: "f_con (\<lambda>f1. Formula.Agg n1 op n2 t f1)"
-
-lemma test:"(\<And>v.(Formula.sat \<sigma> V v i \<alpha>) = (Formula.sat \<sigma> V v i \<beta>)) \<Longrightarrow>
-            ({(x, ecard Zs) | x Zs. Zs = {zs. length zs = b \<and> Formula.sat \<sigma> V (zs @ v) i \<phi> \<and> Formula.eval_trm (zs @ v) f = x} \<and> Zs \<noteq> {}} = {} \<Longrightarrow> fv \<phi> \<subseteq> {0..<b}) \<Longrightarrow> 
-            ({(x, ecard Zs) | x Zs. Zs = {zs. length zs = b \<and> Formula.sat \<sigma> V (zs @ v) i \<beta> \<and> Formula.eval_trm (zs @ v) f = x} \<and> Zs \<noteq> {}} = {} \<Longrightarrow> fv \<beta> \<subseteq> {0..<b})" sledgehammer
+f_con_6_t: "f_con (\<lambda>f1. Formula.Prev I f1)"
 
 
 lemma sub_1: "f_con P \<Longrightarrow> (\<And>v i. Formula.sat \<sigma> V v i (project \<alpha>) = Formula.sat \<sigma> V v i (project \<beta>)) \<Longrightarrow> Formula.sat \<sigma> V v i (P (project \<alpha>)) = Formula.sat \<sigma> V v i (P (project \<beta>))" 
@@ -1065,9 +1060,6 @@ case f_con_1_t
 next
   case (f_con_6_t I)
   then show ?case by (simp split:nat.splits)
-next
-  case (f_con_7_t n1 op n2 t)
-  then show ?case by (simp only:sat.simps same_fv[OF f_con_7_t] )
 qed simp_all
 
 
@@ -1095,10 +1087,34 @@ proof(induction P rule: f_con_agg.induct)
   then show ?case by simp
 qed
 
-lemma fvi_shift: "Formula.fvi b \<phi> = Formula.fvi (Suc b) (Rewriting.shift \<phi>)" sorry
+
+lemma fvi_trm_shift: "b'\<le>b \<Longrightarrow> Formula.fvi_trm b t = Formula.fvi_trm (Suc b) (Rewriting.shiftTI b' t)"  by (induction t;auto)
+
+lemma fvi_shift: "b' \<le> b \<Longrightarrow> Formula.fvi b \<phi> = Formula.fvi (Suc b) (Rewriting.shiftI b' \<phi>)" 
+proof(induction \<phi> arbitrary: b b')
+  case (Agg x1 x2 x3 x4 \<phi>)
+  then have le:"b' + x3 \<le> b + x3" by simp
+  from Agg show ?case by(simp add:Agg(1)[OF le] fvi_trm_shift[OF le])
+next
+  case (MatchF I r)
+  then show ?case by (induction r;auto)
+next
+  case (MatchP I r)
+  then show ?case by (induction r;auto)
+qed  (auto simp add: fvi_trm_shift)
 
 lemma rewrite_fv: "Formula.fvi b (project \<alpha>) = Formula.fvi b (project (rewrite \<alpha> t))"
 proof(induction \<alpha> t arbitrary:b rule:rewrite.induct)
+  case (2 \<alpha> \<beta> I \<gamma> t)
+  then show ?case 
+  proof(cases "prop_cond \<alpha> \<beta> ")
+    case True
+    then show ?thesis using 2 by fastforce
+  next
+    case False
+    then show ?thesis using 2 by auto
+  qed
+next
   case (3 \<alpha> \<beta> I \<gamma> t)
   then show ?case  
   proof(cases "prop_cond \<alpha> \<beta>")
@@ -1171,6 +1187,17 @@ next
       then show ?thesis using 4 by auto
     qed
 next
+  case (6 \<alpha> \<beta> I \<gamma> t)
+  then show ?case 
+      apply(simp add: 6(1)[symmetric])
+    by fastforce
+next
+  case (7 \<alpha> \<beta> I \<gamma> t)
+  then show ?case 
+      apply(simp add: 7(1)[symmetric])
+      by fastforce
+
+next
   case (14 \<alpha> \<gamma> I \<beta> t)
   let ?a = "t=Same \<and> excl_zero I \<and> prop_cond \<alpha> \<beta>"
   let ?b = "t=Same \<and> excl_zero I \<and> prop_cond \<gamma> \<beta>"
@@ -1184,30 +1211,116 @@ next
   then show ?case  
   proof(cases)
     case a(*TODO use simplifier for these proofs, also prove shift_fv2*)
-    then show ?thesis using 14 sorry
+    then show ?thesis using 14 
+      apply(simp add: 14(1)[symmetric])
+      by auto
   next
     case b
-    then show ?thesis using 14 sorry
+    then show ?thesis 
+    proof(cases "prop_cond \<alpha> \<beta>")
+      case True
+      then show ?thesis using b 14 by blast
+    next
+      case False
+      then show ?thesis using b 14 by fastforce
+    qed
   next
     case c
-    then show ?thesis using 14 sorry
+    then show ?thesis using 14 
+      apply(simp add: 14(1)[symmetric])
+      by blast
   next
     case d
-    then show ?thesis using 14 sorry
+    then show ?thesis using 14
+      apply(simp add: 14(1)[symmetric])
+      by blast
   next
     case e
-  then show ?thesis using 14 sorry
+    then show ?thesis 
+      proof(cases "t=Swapped")
+        case True
+        then show ?thesis using e 14 
+          apply(simp only:rewrite.simps if_False Let_def fix_r.simps)
+          apply(simp only:project1.simps project2.simps)
+          by auto
+      next
+        case False
+        then show ?thesis using e 14 not_swapped[OF False]
+          apply(simp only:rewrite.simps if_False Let_def fix_r.simps)
+          apply(simp only:project1.simps project2.simps)
+          by auto
+      qed
   qed
 next
   case (15 \<alpha> \<gamma> I \<beta> t)
-  then show ?case  sorry
+  let ?a = "t=Same \<and> excl_zero I \<and> prop_cond \<alpha> \<beta>"
+  let ?b = "t=Same \<and> excl_zero I \<and> prop_cond \<gamma> \<beta>"
+  let ?c = "t=Swapped \<and> prop_cond \<alpha> \<beta>"
+  let ?d = "t=Swapped \<and> prop_cond \<gamma> \<beta>"
+  consider (a) ?a |
+           (b) "\<not>?a" "?b" | 
+           (c) "\<not>?a" "\<not>?b" "?c" |
+           (d) "\<not>?a" "\<not>?b" "\<not>?c" "?d" |
+           (e) "\<not>?a" "\<not>?b" "\<not>?c" "\<not>?d"  by argo
+  then show ?case  
+  proof(cases)
+    case a(*TODO use simplifier for these proofs, also prove shift_fv2*)
+    then show ?thesis using 15 
+      apply(simp add: 15(1)[symmetric])
+      by auto
+  next
+    case b
+    then show ?thesis 
+    proof(cases "prop_cond \<alpha> \<beta>")
+      case True
+      then show ?thesis using b 15 by blast
+    next
+      case False
+      then show ?thesis using b 15 by fastforce
+    qed
+  next
+    case c
+    then show ?thesis using 15 
+      apply(simp add: 15(1)[symmetric])
+      by blast
+  next
+    case d
+    then show ?thesis using 15
+      apply(simp add: 15(1)[symmetric])
+      by blast
+  next
+    case e
+    then show ?thesis 
+      proof(cases "t=Swapped")
+        case True
+        then show ?thesis using e 15 
+          apply(simp only:rewrite.simps if_False Let_def fix_r.simps)
+          apply(simp only:project1.simps project2.simps)
+          by auto
+      next
+        case False
+        then show ?thesis using e 15 not_swapped[OF False]
+          apply(simp only:rewrite.simps if_False Let_def fix_r.simps)
+          apply(simp only:project1.simps project2.simps)
+          by auto
+      qed
+    qed
+next
+  case ("16_10" v va vb vc vd I r)
+  then show ?case by fastforce
+next
+  case ("17_10" v va vb vc vd I r)
+  then show ?case by fastforce
 next
 
+  case ("18_8" l v va vb vc vd)
+  then show ?case by fastforce
+next
   case (23 \<phi> t)
-  then show ?case sorry
+  then show ?case by simp
 next
   case (24 y \<omega> b' f \<phi> t)
-  then show ?case sorry
+  then show ?case by simp
 next
 case (34 I r t)
   then show ?case by (induction r;auto)
