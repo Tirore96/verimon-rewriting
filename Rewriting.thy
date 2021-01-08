@@ -207,13 +207,20 @@ lemma project_embed[simp]: "project (embed f) = f"
 
 
 definition   "rsat \<sigma> V v i \<phi> \<equiv> Formula.sat \<sigma> V v i (project \<phi>)"
+abbreviation diamond_b where "diamond_b I \<alpha> \<equiv> Formula.Since TT I \<alpha>"  
+abbreviation square_b where "square_b I \<alpha> \<equiv> Formula.Neg (diamond_b I (Formula.Neg \<alpha>))"  
+abbreviation diamond_w where "diamond_w I \<alpha> \<equiv> Formula.Until TT I \<alpha>"
+abbreviation square_w where "square_w I \<alpha> \<equiv> Formula.Neg (diamond_w I (Formula.Neg \<alpha>))"
+abbreviation excl_zero where "excl_zero I \<equiv> \<not> (mem 0 I)"
+
 
 primrec rr_regex where
   "rr_regex rr (Regex.Skip n) = {}"
 | "rr_regex rr (Regex.Test \<phi>) = rr \<phi>"
-| "rr_regex rr (Regex.Plus r s) = rr_regex rr r \<union> rr_regex rr s"
+| "rr_regex rr (Regex.Plus r s) = rr_regex rr r \<inter> rr_regex rr s"
 | "rr_regex rr (Regex.Times r s) = rr_regex rr r \<union> rr_regex rr s"
-| "rr_regex rr (Regex.Star r) = rr_regex rr r"
+| "rr_regex rr (Regex.Star r) = {}"
+
 
 primrec tvars where
  "tvars (Formula.Var v) = [v]"
@@ -247,20 +254,23 @@ primrec rr :: "nat \<Rightarrow> rformula \<Rightarrow> nat set" where
 | "rr b (RAnds \<phi>s) = (let xs = map (rr b) \<phi>s in \<Union>x\<in>set xs. x)"
 | "rr b (RExists \<phi>) = (if (0 \<in> (rr 0 \<phi>)) then rr (Suc b) \<phi>
                                             else {})"
-| "rr b (RAgg y \<omega> b' f \<phi>) = rr b \<phi>" (*How?*)
+| "rr b (RAgg y \<omega> b' f \<phi>) = (if {0..<b'} \<subseteq> rr 0 \<phi> then {y} \<union> rr (b+b') \<phi>
+                                                   else {})" (*How?*)
+
+
 | "rr b (RPrev I \<phi>) = rr b \<phi>"
 | "rr b (RNext I \<phi>) = rr b \<phi>"
 | "rr b (RSince \<phi> I \<psi>) = rr b \<psi>"
 | "rr b (RUntil \<phi> I \<psi>) = rr b \<psi>"
-| "rr b (RRelease \<phi> I \<psi>) = rr b \<psi>"
-| "rr b (RTrigger \<phi> I \<psi>) = rr b \<psi>"
-| "rr b (RMatchF I r) = {}"
-| "rr b (RMatchP I r) = {}"
+| "rr b (RRelease \<phi> I \<psi>) = (if excl_zero I then {} else rr b \<psi>)"
+| "rr b (RTrigger \<phi> I \<psi>) = (if excl_zero I then {} else rr b \<psi>)"
+| "rr b (RMatchF I r) = {}" (*rr_regex should have been used here*)
+| "rr b (RMatchP I r) = {}" (*and here*)
 | "rr b (RNeg \<alpha>) = {}"
-| "rr b (RDiamondW I \<alpha>) = {}"
-| "rr b (RDiamondB I \<alpha>) = {}"
-| "rr b (RSquareW I \<alpha>) = {}"
-| "rr b (RSquareB I \<alpha>) = {}"
+| "rr b (RDiamondW I \<alpha>) = rr b \<alpha>"
+| "rr b (RDiamondB I \<alpha>) = rr b \<alpha>"
+| "rr b (RSquareW I \<alpha>) = (if excl_zero I then {} else rr b \<alpha>)"
+| "rr b (RSquareB I \<alpha>) = (if excl_zero I then {} else rr b \<alpha>)"
 
 abbreviation fvi_r where
       "fvi_r b r \<equiv> Formula.fvi b (project r)"
@@ -498,11 +508,7 @@ lemma sat_3_d: "Formula.sat \<sigma> V v i (Formula.Neg (Formula.Next I \<alpha>
 (*lemma FF_simp: "FF = Formula.FF" by (simp add: Formula.FF_def)
 lemma TT_simp: "TT = Formula.TT" by (simp add: Formula.TT_def FF_simp)*)
 
-abbreviation diamond_b where "diamond_b I \<alpha> \<equiv> Formula.Since TT I \<alpha>"  
-abbreviation square_b where "square_b I \<alpha> \<equiv> Formula.Neg (diamond_b I (Formula.Neg \<alpha>))"  
-abbreviation diamond_w where "diamond_w I \<alpha> \<equiv> Formula.Until TT I \<alpha>"
-abbreviation square_w where "square_w I \<alpha> \<equiv> Formula.Neg (diamond_w I (Formula.Neg \<alpha>))"
-abbreviation excl_zero where "excl_zero I \<equiv> \<not> (mem 0 I)"
+
 
 (*Maybe interesting lemma for intution*)
 lemma strict_until: "excl_zero I \<Longrightarrow> Formula.sat \<sigma> V v i (Formula.Until \<phi> I \<psi>) = 
@@ -1754,6 +1760,9 @@ qed (simp only:rewrite.simps fix_r.simps rsat_def;auto)+
 
 lemma final_sat: "Formula.sat \<sigma> V v i (rewrite_f f) = Formula.sat \<sigma> V v i f" 
   using rewrite_sat rsat_def by auto
+
+
+definition "rewrite'\<equiv> rewrite_f"
 
 
 end
